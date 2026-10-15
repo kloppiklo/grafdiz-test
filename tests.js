@@ -1,5 +1,6 @@
 // Список тестов курса. Чтобы добавить тест: файл questions/<id>.js,
 // строка здесь со status: "open" и ключ ответов в базе для этого id.
+// theory — необязательная ссылка на презентацию с теорией (папка materials/).
 window.TESTS = [
   {
     id: "module1", status: "open", color: "yellow",
@@ -9,7 +10,8 @@ window.TESTS = [
   {
     id: "color", status: "open", color: "pink",
     title: "Цвет", module: "Модуль 2 · цвет", count: 12,
-    topics: ["Свет и глаз", "Цветовой круг", "Схемы", "Модели", "Психология"]
+    topics: ["Свет и глаз", "Цветовой круг", "Схемы", "Модели", "Психология"],
+    theory: "materials/color.html"
   },
   { id: "module2", status: "soon", color: "pink", title: "Сетка и типографика", module: "Модуль 2 · пары 05–10" },
   { id: "module3", status: "soon", color: "lavender", title: "Изображение и графическая система", module: "Модуль 3 · пары 11–16" },

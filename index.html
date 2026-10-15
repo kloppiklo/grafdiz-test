@@ -49,6 +49,7 @@
       <div class="row"><span class="chip">${esc(t.module)}</span>${s.pill}</div>
       <h2>${esc(t.title)}</h2>
       ${t.topics ? `<div class="chips">${t.topics.map(x => `<span class="chip ghost">${esc(x)}</span>`).join("")}</div>` : ""}
+      ${t.theory ? `<a class="btn ghost block" href="${esc(t.theory)}" target="_blank" rel="noopener">Теория: презентация</a>` : ""}
       <a class="btn block" href="test.html?t=${encodeURIComponent(t.id)}" data-id="${esc(t.id)}" ${s.again ? "data-again" : ""}>${s.cta} <span class="arr">→</span></a>
     </section>`;
   }).join("");
