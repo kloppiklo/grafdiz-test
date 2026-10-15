@@ -23,7 +23,8 @@ window.TESTS = [
 // Отработки пропущенных занятий: содержимое в otrabotki/<id>.js, страница otrabotka.html?m=<id>.
 // Сданные работы лежат в базе (quiz.submissions), проверка — в admin-otr.html.
 window.OTRABOTKI = [
-  { id: "m1", status: "open", color: "yellow", title: "Визуальное мышление", module: "Модуль 1 · пары 01–04", pairs: 4 }
+  { id: "m1", status: "open", color: "yellow", title: "Визуальное мышление", module: "Модуль 1 · пары 01–04", pairs: 4 },
+  { id: "color", status: "open", color: "pink", title: "Колористика", module: "Модуль 2 · цвет", pairs: 4 }
 ];
 
 // Имя студента запоминается на устройстве для всех тестов

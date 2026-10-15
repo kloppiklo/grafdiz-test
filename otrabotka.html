@@ -49,6 +49,9 @@ function run(M, pairId) {
     ok: { pill: "good", text: "засчитано" },
     redo: { pill: "bad", text: "на доработку" }
   };
+  // как называется единица отработки: «Пара 01» в модуле 1, «Тема 1» в колористике
+  const U = Object.assign({ one: "Пара", next: "пара", many: "пар" }, M.unit || {});
+  const FIGMA_HOW = 'В Figma нажмите <b>Share</b> → в поле доступа выберите <b>Anyone with the link · can view</b> → <b>Copy link</b>. Все фреймы задания — в одном файле.';
   const url = p => "otrabotka.html?m=" + encodeURIComponent(M.id) + (p ? "&p=" + encodeURIComponent(p) : "");
 
   let server = {};   // id сдачи → { status, teacher_note }
@@ -102,7 +105,7 @@ function run(M, pairId) {
       const st = STATUS[statusOf(p.id)];
       const ch = checks[p.id] ? Object.keys(checks[p.id]).length : 0;
       return `<section class="card ${p.color} test-card">
-        <div class="row"><span class="chip">Пара ${esc(p.n)}</span><span class="grow"></span><span class="pill ${st.pill}">${st.text}</span></div>
+        <div class="row"><span class="chip">${U.one} ${esc(p.n)}</span><span class="grow"></span><span class="pill ${st.pill}">${st.text}</span></div>
         <h2>${esc(p.title)}</h2>
         <div class="chips"><span class="chip ghost">${esc(p.result)}</span><span class="chip ghost">${esc(p.time)}</span>${ch ? `<span class="chip ghost">самопроверка ${ch}/${p.check.length}</span>` : ""}</div>
         <a class="btn block" href="${url(p.id)}">${statusOf(p.id) === "none" ? "Начать" : "Открыть"} <span class="arr">→</span></a>
@@ -118,13 +121,13 @@ function run(M, pairId) {
       <section class="card">
         <h2>Как проходить</h2>
         <ol class="howto">
-          <li><b>Коротко о главном</b><span>конспект пары за 5–10 минут</span></li>
+          <li><b>Коротко о главном</b><span>короткий конспект за 5–10 минут</span></li>
           <li><b>Посмотри</b><span>примеры: как правильно и как нет</span></li>
           <li><b>Проверь себя</b><span>3 вопроса, сразу видно ответ</span></li>
-          <li><b>Сделай</b><span>практика в Figma с критериями</span></li>
-          <li><b>Сдай</b><span>ссылка на Figma — преподаватель проверит</span></li>
+          <li><b>Сделай</b><span>${esc(M.practiceNote || "практика в Figma с критериями")}</span></li>
+          <li><b>Сдай</b><span>${esc(M.submitNote || "ссылка на Figma — преподаватель проверит")}</span></li>
         </ol>
-        <p class="note">В конце — итоговый тест модуля. Пары можно проходить в любом порядке, но лучше по очереди.</p>
+        <p class="note">В конце — итоговый тест. ${esc(M.orderNote || "Пары можно проходить в любом порядке, но лучше по очереди.")}</p>
       </section>
 
       <section class="card lavender">
@@ -134,13 +137,19 @@ function run(M, pairId) {
       </section>
       </div>
 
+      ${M.materials ? `<section class="card">
+        <h2>Материалы</h2>
+        <div class="list flat">${M.materials.map(x => `<a class="li" href="${esc(x.href)}" ${x.download ? "download" : ""}><span class="sw" style="background:var(--${x.color || "cream"})">${esc(x.icon || "↗")}</span>
+          <div class="grow">${esc(x.title)}<small>${esc(x.note || "")}</small></div><span class="go">›</span></a>`).join("")}</div>
+      </section>` : ""}
+
       <div class="grid-cards">
       ${cards}
 
       <section class="card peach test-card">
         <div class="row"><span class="chip">Финал</span><span class="grow"></span>${testPill}</div>
-        <h2>Итоговый тест модуля</h2>
-        <p>10 вопросов по всем четырём парам. Результат увидит преподаватель.</p>
+        <h2>${esc(M.finalTitle || "Итоговый тест модуля")}</h2>
+        <p>${esc(M.finalNote || "10 вопросов по всем четырём парам. Результат увидит преподаватель.")}</p>
         <a class="btn block" href="test.html?t=${encodeURIComponent(M.test)}">${last ? "Пройти ещё раз" : "Пройти тест"} <span class="arr">→</span></a>
       </section>
       </div>`;
@@ -179,7 +188,7 @@ function run(M, pairId) {
   }
 
   function renderPair(p) {
-    document.title = "Пара " + p.n + " · " + p.title;
+    document.title = U.one + " " + p.n + " · " + p.title;
     const idx = M.pairs.indexOf(p);
     const next = M.pairs[idx + 1];
     const who = window.Student.get();
@@ -195,7 +204,7 @@ function run(M, pairId) {
       </div>` : "";
 
     app.innerHTML = `
-      <div class="topbar"><a class="icon-btn" href="${url()}" aria-label="К списку пар">←</a><span class="chip">Пара ${esc(p.n)} из ${M.pairs.length}</span><span class="chip">${esc(M.module.split(" · ")[0])}</span></div>
+      <div class="topbar"><a class="icon-btn" href="${url()}" aria-label="К списку: ${esc(U.many)}">←</a><span class="chip">${U.one} ${esc(p.n)} из ${M.pairs.length}</span><span class="chip">${esc(M.module.split(" · ")[0])}</span></div>
       <h1 class="h1-pair">${esc(p.title)}</h1>
       <div class="pair-layout">
       <nav class="chips sec-nav" aria-label="Шаги">
@@ -230,19 +239,19 @@ function run(M, pairId) {
         <div class="sub-box"><b>Ограничения</b><ul class="blist">${T.limits.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
         <div class="sub-box"><b>Порядок работы</b><ol class="steps-list">${T.steps.map(x => `<li>${esc(x)}</li>`).join("")}</ol></div>
         <div class="sub-box"><b>Работа засчитывается, если</b><ul class="crit">${T.criteria.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
-        <div class="sub-box"><b>Что понадобится в Figma</b><div class="chips">${p.figma.map(x => `<span class="chip ghost-w">${esc(x)}</span>`).join("")}</div></div>
+        <div class="sub-box"><b>${esc(p.toolsTitle || "Что понадобится в Figma")}</b><div class="chips">${p.figma.map(x => `<span class="chip ghost-w">${esc(x)}</span>`).join("")}</div></div>
       </section>
 
       <section class="card lavender" id="s5">
         <div class="sec-head"><span class="sec-num">5</span><h2>Сдай</h2></div>
         ${history}
-        <div class="look"><b>Как получить ссылку.</b> В Figma нажмите <b>Share</b> → в поле доступа выберите <b>Anyone with the link · can view</b> → <b>Copy link</b>. Все фреймы задания — в одном файле.</div>
+        <div class="look"><b>Как получить ссылку.</b> ${T.submitHow || FIGMA_HOW}</div>
         <form class="sub-form" id="sub" novalidate>
           <div class="two">
             <label class="field" for="first">Имя<input type="text" id="first" autocomplete="given-name" maxlength="60" value="${esc(who.first)}"></label>
             <label class="field" for="last">Фамилия<input type="text" id="last" autocomplete="family-name" maxlength="60" value="${esc(who.last)}"></label>
           </div>
-          <label class="field" for="link">Ссылка на работу<input type="url" id="link" inputmode="url" placeholder="https://www.figma.com/design/…" maxlength="500"></label>
+          <label class="field" for="link">Ссылка на работу<input type="url" id="link" inputmode="url" placeholder="${esc(T.linkHint || "https://www.figma.com/design/…")}" maxlength="500"></label>
           <label class="field" for="comment">Комментарий (необязательно)<textarea id="comment" rows="3" maxlength="1000" placeholder="Что получилось, что было сложно"></textarea></label>
           <p class="error" id="sub-err" hidden></p>
           <button class="btn block" type="submit" id="send">${l ? "Сдать ещё раз" : "Сдать работу"} <span class="arr">→</span></button>
@@ -250,9 +259,9 @@ function run(M, pairId) {
       </section>
 
       ${next
-        ? `<a class="btn block" href="${url(next.id)}">Дальше: пара ${esc(next.n)} <span class="arr">→</span></a>`
-        : `<a class="btn block" href="test.html?t=${encodeURIComponent(M.test)}">Итоговый тест модуля <span class="arr">→</span></a>`}
-      <a class="btn ghost block" href="${url()}">Все пары модуля</a>
+        ? `<a class="btn block" href="${url(next.id)}">Дальше: ${esc(U.next)} ${esc(next.n)} <span class="arr">→</span></a>`
+        : `<a class="btn block" href="test.html?t=${encodeURIComponent(M.test)}">${esc(M.finalTitle || "Итоговый тест модуля")} <span class="arr">→</span></a>`}
+      <a class="btn ghost block" href="${url()}">${esc(M.allLabel || "Все пары модуля")}</a>
       </div></div>`;
 
     // самопроверка
@@ -294,7 +303,7 @@ function run(M, pairId) {
         if (st) st.scrollIntoView({ block: "start" });
       } catch (ex) {
         busy = false; btn.disabled = false; btn.innerHTML = 'Сдать работу <span class="arr">→</span>';
-        fail(/bad link/.test(ex.message) ? "Ссылка не подходит. Скопируйте её из Figma кнопкой Copy link." : "Работа не отправилась. Проверьте интернет и попробуйте ещё раз.");
+        fail(/bad link/.test(ex.message) ? "Ссылка не подходит. Вставьте её целиком — она начинается с https://" : "Работа не отправилась. Проверьте интернет и попробуйте ещё раз.");
       }
     });
   }

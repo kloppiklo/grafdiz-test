@@ -85,7 +85,7 @@
 
   function render() {
     const pairs = M.pairs;
-    const pairName = id => { const p = pairs.find(x => x.id === id); return p ? "Пара " + p.n + " · " + p.title : id; };
+    const pairName = id => { const p = pairs.find(x => x.id === id); return p ? ((M.unit && M.unit.one) || "Пара") + " " + p.n + " · " + p.title : id; };
 
     // сводка: студент × пара, по последней сдаче
     const people = {};
@@ -159,7 +159,7 @@
         </div>
       </div>
       ${list.length ? `<div class="people">${cards}</div>`
-        : `<div class="card yellow"><h2>${subs.length ? "Здесь пусто" : "Пока никто не сдал"}</h2><p>${subs.length ? "В этом фильтре работ нет — загляните во «все»." : "Студенты сдают ссылку на Figma со страницы отработки. Новые работы появятся здесь."}</p></div>`}`;
+        : `<div class="card yellow"><h2>${subs.length ? "Здесь пусто" : "Пока никто не сдал"}</h2><p>${subs.length ? "В этом фильтре работ нет — загляните во «все»." : "Студенты сдают ссылку на работу со страницы отработки. Новые работы появятся здесь."}</p></div>`}`;
 
     app.querySelector("#refresh").onclick = () => fetchData();
     app.querySelectorAll("[data-mod]").forEach(b => b.onclick = () => {
