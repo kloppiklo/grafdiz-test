@@ -25,3 +25,8 @@ window.Student = {
   set(first, last) { try { localStorage.setItem(this.KEY, JSON.stringify({ first, last })); } catch (e) {} }
 };
 window.quizStoreKey = id => "quiz_" + id + "_v2";
+
+// Приложение на телефоне: регистрируем service worker (см. sw.js)
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}

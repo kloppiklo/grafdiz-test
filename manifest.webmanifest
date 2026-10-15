@@ -1,0 +1,17 @@
+{
+  "name": "Тесты по графическому дизайну",
+  "short_name": "Граф. дизайн",
+  "description": "Тесты по темам курса графического дизайна",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f0e2",
+  "theme_color": "#f6f0e2",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

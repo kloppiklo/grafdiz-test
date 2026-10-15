@@ -258,3 +258,5 @@ button.icon-btn { cursor: pointer; }
 .admin .ring text { font-size: 20px; }
 .test-card .pill { background: var(--white); }
 .pill { white-space: nowrap; flex: none; }
+
+.admin-link { margin-top: 8px; font-size: 15px; color: var(--ink-2); }
