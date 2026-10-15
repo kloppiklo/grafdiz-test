@@ -166,7 +166,7 @@
   // ---------- вкладки
   function renderBar(active) {
     bar.hidden = false;
-    bar.innerHTML = TABS.map(([id, label]) => `
+    bar.innerHTML = `<a class="tab-brand" href="#tests"><img src="icons/icon-192.png" alt="">Граф.<em>дизайн</em></a>` + TABS.map(([id, label]) => `
       <a class="tab ${id === active ? "on" : ""}" href="#${id}" ${id === active ? 'aria-current="page"' : ""}>
         <span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id]}</svg></span>${label}</a>`).join("");
   }
@@ -207,10 +207,12 @@
     app.innerHTML = `
       <div class="hello"><div><p class="eyebrow">Привет,</p><h1 class="h-name">${esc(who.first)}!</h1></div>
         <a class="ava" href="#profile" aria-label="Профиль">${esc((who.first || "?")[0].toUpperCase())}</a></div>
-      ${contCard}${cards}
-      ${otr ? `<h2 class="sub">Отработки</h2><p class="muted">Пропустили пару или тема не далась? Разберите её сами и сдайте практику.</p><div class="list">${otr}</div>` : ""}
-      <h2 class="sub">Дальше по курсу</h2>
-      <div class="list">${soon}</div>`;
+      <div class="grid-cards">${contCard}${cards}</div>
+      <div class="cols">
+        ${otr ? `<div class="col"><h2 class="sub">Отработки</h2><p class="muted">Пропустили пару или тема не далась? Разберите её сами и сдайте практику.</p><div class="list">${otr}</div></div>` : ""}
+        <div class="col"><h2 class="sub">Дальше по курсу</h2>
+        <div class="list">${soon}</div></div>
+      </div>`;
     // «Пересдать»: сбрасываем прошлое прохождение на этом устройстве
     app.querySelectorAll("[data-again]").forEach(a => a.addEventListener("click", () => {
       try { localStorage.removeItem(window.quizStoreKey(a.dataset.id)); } catch (e) {}
@@ -246,15 +248,16 @@
     const tip = weak.length ? `<p class="note">Совет: по теме «${esc(weak[0].title)}» меньше 80% — ${weak[0].theory ? `загляните в <a href="theory.html?t=${encodeURIComponent(weak[0].id)}">теорию</a> и` : ""} пересдайте.</p>` : "";
     app.innerHTML = `
       <h1>Прогресс</h1>
+      <div class="cols"><div class="col">
       <section class="card lavender">
         <p class="eyebrow">Пройдено тем курса</p>
         <p class="big-num">${done.length} <small>из ${total}</small></p>
         <div class="bar light"><i style="width:${Math.round(done.length / total * 100)}%"></i></div>
         <p class="note ink">${avg === null ? "Пройдите первый тест — здесь появится средний результат." : "Средний результат — " + avg + "%"}</p>
       </section>
-      <div class="list">${rows}</div>
       ${tip}
-      <p class="note">Прогресс хранится на этом телефоне. Все результаты видит преподаватель.</p>`;
+      <p class="note">Прогресс хранится на этом устройстве. Все результаты видит преподаватель.</p>
+      </div><div class="col"><div class="list">${rows}</div></div></div>`;
   }
 
   function profileTab() {

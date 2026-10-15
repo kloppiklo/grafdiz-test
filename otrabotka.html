@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="wrap" id="app"></main>
+<main class="wrap wide-d" id="app"></main>
 
 <script src="tests.js"></script>
 <script src="config.js"></script>
@@ -114,6 +114,7 @@ function run(M, pairId) {
       <h1>Отработка:<br><em>${esc(M.title.toLowerCase())}</em></h1>
       <p class="muted">${esc(M.intro)}</p>
 
+      <div class="cols">
       <section class="card">
         <h2>Как проходить</h2>
         <ol class="howto">
@@ -131,7 +132,9 @@ function run(M, pairId) {
         <p class="score">${sent}<small> / ${M.pairs.length} сдано</small></p>
         <div class="bar big"><i style="width:${Math.round(sent / M.pairs.length * 100)}%"></i></div>
       </section>
+      </div>
 
+      <div class="grid-cards">
       ${cards}
 
       <section class="card peach test-card">
@@ -139,7 +142,8 @@ function run(M, pairId) {
         <h2>Итоговый тест модуля</h2>
         <p>10 вопросов по всем четырём парам. Результат увидит преподаватель.</p>
         <a class="btn block" href="test.html?t=${encodeURIComponent(M.test)}">${last ? "Пройти ещё раз" : "Пройти тест"} <span class="arr">→</span></a>
-      </section>`;
+      </section>
+      </div>`;
   }
 
   // ---------- одна пара ----------
@@ -193,9 +197,11 @@ function run(M, pairId) {
     app.innerHTML = `
       <div class="topbar"><a class="icon-btn" href="${url()}" aria-label="К списку пар">←</a><span class="chip">Пара ${esc(p.n)} из ${M.pairs.length}</span><span class="chip">${esc(M.module.split(" · ")[0])}</span></div>
       <h1 class="h1-pair">${esc(p.title)}</h1>
+      <div class="pair-layout">
       <nav class="chips sec-nav" aria-label="Шаги">
         <a class="chip" href="#s1">1 · Главное</a><a class="chip" href="#s2">2 · Посмотри</a><a class="chip" href="#s3">3 · Проверь</a><a class="chip" href="#s4">4 · Сделай</a><a class="chip" href="#s5">5 · Сдай</a>
       </nav>
+      <div class="pair-main">
 
       <section class="card" id="s1">
         <div class="sec-head"><span class="sec-num">1</span><h2>Коротко о главном</h2></div>
@@ -246,7 +252,8 @@ function run(M, pairId) {
       ${next
         ? `<a class="btn block" href="${url(next.id)}">Дальше: пара ${esc(next.n)} <span class="arr">→</span></a>`
         : `<a class="btn block" href="test.html?t=${encodeURIComponent(M.test)}">Итоговый тест модуля <span class="arr">→</span></a>`}
-      <a class="btn ghost block" href="${url()}">Все пары модуля</a>`;
+      <a class="btn ghost block" href="${url()}">Все пары модуля</a>
+      </div></div>`;
 
     // самопроверка
     app.querySelector("#checks").addEventListener("click", e => {
