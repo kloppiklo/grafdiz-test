@@ -197,10 +197,18 @@
     const soon = SOON.map(t => `
       <div class="li soonrow"><span class="dot-c" style="background:var(--${t.color})"></span>
         <div class="grow">${esc(t.title)}<small>${esc(t.module)}</small></div><span class="pill plain">скоро</span></div>`).join("");
+    // отработки пропущенных пар (otrabotka.html); «сдано» — по сдачам с этого устройства
+    const otr = (window.OTRABOTKI || []).filter(o => o.status === "open").map(o => {
+      const sent = new Set(window.OtrStore.get(o.id).map(x => x.task)).size;
+      return `
+      <a class="li" href="otrabotka.html?m=${encodeURIComponent(o.id)}"><span class="sw" style="background:var(--${o.color})"></span>
+        <div class="grow">${esc(o.title)}<small>${esc(o.module)} · ${sent ? "сдано " + sent + " из " + o.pairs : "конспект, примеры, практика"}</small></div><span class="go">›</span></a>`;
+    }).join("");
     app.innerHTML = `
       <div class="hello"><div><p class="eyebrow">Привет,</p><h1 class="h-name">${esc(who.first)}!</h1></div>
         <a class="ava" href="#profile" aria-label="Профиль">${esc((who.first || "?")[0].toUpperCase())}</a></div>
       ${contCard}${cards}
+      ${otr ? `<h2 class="sub">Отработки</h2><p class="muted">Пропустили пару или тема не далась? Разберите её сами и сдайте практику.</p><div class="list">${otr}</div>` : ""}
       <h2 class="sub">Дальше по курсу</h2>
       <div class="list">${soon}</div>`;
     // «Пересдать»: сбрасываем прошлое прохождение на этом устройстве

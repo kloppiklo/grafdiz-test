@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f0e2">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="robots" content="noindex">
+<title>Сдачи отработок</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap admin" id="app"></main>
+
+<script src="tests.js"></script>
+<script src="config.js"></script>
+<script>
+// Проверка отработок: сдачи студентов по модулю, отметка «засчитано / на доработку» с комментарием.
+// Код преподавателя тот же, что в admin.html (хранится до закрытия вкладки).
+(function () {
+  const app = document.getElementById("app");
+  const CODE_KEY = "quiz_admin_code";
+  const MODULES = window.OTRABOTKI.filter(o => o.status === "open");
+  const AVATAR = ["yellow", "pink", "lavender", "mint", "peach", "blue"];
+  const STATUS = { new: ["wait", "новая"], ok: ["good", "засчитано"], redo: ["bad", "на доработку"] };
+
+  let code = "";
+  try { code = sessionStorage.getItem(CODE_KEY) || ""; } catch (e) {}
+  let modId = new URLSearchParams(location.search).get("m");
+  if (!MODULES.some(m => m.id === modId)) modId = MODULES[0].id;
+  let M = null, subs = null, filter = "new", open = null, confirmDel = null;
+  const contentCache = {};
+
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = iso => new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const personKey = s => (s.last_name + " " + s.first_name).toLowerCase().replace(/\s+/g, " ").trim();
+  const safeUrl = u => /^https?:\/\//i.test(u) ? u : "#";
+
+  function loadContent(id) {
+    if (contentCache[id]) return Promise.resolve(contentCache[id]);
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "otrabotki/" + id + ".js";
+      s.onload = () => { contentCache[id] = window.OTR; resolve(window.OTR); };
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  function login(errText) {
+    app.innerHTML = `
+      <div class="topbar"><a class="icon-btn" href="admin.html" aria-label="К результатам тестов">←</a><span class="chip">Для преподавателя</span></div>
+      <h1>Сдачи <em>отработок</em></h1>
+      <form class="card lavender login" id="login" novalidate>
+        <label class="field" for="code">Код преподавателя
+          <input type="password" id="code" autocomplete="current-password" required>
+        </label>
+        <p class="error" ${errText ? "" : "hidden"}>${esc(errText || "")}</p>
+        <button class="btn block" type="submit">Открыть сдачи <span class="arr">→</span></button>
+      </form>`;
+    document.getElementById("login").addEventListener("submit", e => {
+      e.preventDefault();
+      code = document.getElementById("code").value.trim();
+      fetchData();
+    });
+  }
+
+  async function fetchData(quiet) {
+    try {
+      const [content, res] = await Promise.all([loadContent(modId), window.quizRpc("otr_admin_list", { p_module: modId, p_code: code })]);
+      M = content; subs = res;
+      try { sessionStorage.setItem(CODE_KEY, code); } catch (e) {}
+      render();
+    } catch (e) {
+      if (quiet === true) return;
+      try { sessionStorage.removeItem(CODE_KEY); } catch (e2) {}
+      login(e && /code/i.test(e.message) ? "Код не подошёл. Проверьте его и попробуйте ещё раз." : "Не удалось загрузить сдачи. Проверьте интернет и попробуйте ещё раз.");
+    }
+  }
+
+  function render() {
+    const pairs = M.pairs;
+    const pairName = id => { const p = pairs.find(x => x.id === id); return p ? "Пара " + p.n + " · " + p.title : id; };
+
+    // сводка: студент × пара, по последней сдаче
+    const people = {};
+    subs.slice().sort((a, b) => a.created_at.localeCompare(b.created_at)).forEach(s => {
+      const k = personKey(s);
+      people[k] = people[k] || { name: s.last_name + " " + s.first_name, tasks: {} };
+      people[k].tasks[s.task_id] = s;
+    });
+    const grid = Object.values(people).sort((a, b) => a.name.localeCompare(b.name, "ru")).map(p => `
+      <tr><td>${esc(p.name)}</td>${pairs.map(x => {
+        const s = p.tasks[x.id];
+        return `<td class="num">${s ? `<span class="pill ${STATUS[s.status][0]}" title="${esc(STATUS[s.status][1])}">${s.status === "ok" ? "✓" : s.status === "redo" ? "↺" : "•"}</span>` : "—"}</td>`;
+      }).join("")}</tr>`).join("");
+
+    const counts = { new: 0, redo: 0, ok: 0 };
+    subs.forEach(s => counts[s.status]++);
+    const list = subs.filter(s => filter === "all" || s.status === filter);
+
+    const cards = list.map(s => {
+      const color = AVATAR[[...personKey(s)].reduce((h, c) => h + c.charCodeAt(0), 0) % AVATAR.length];
+      const initials = ((s.first_name[0] || "") + (s.last_name[0] || "")).toUpperCase();
+      const isOpen = open === s.id;
+      return `<div class="sub-card">
+        <div class="row">
+          <span class="avatar" style="background: var(--${color})">${esc(initials)}</span>
+          <span class="grow"><b>${esc(s.last_name)} ${esc(s.first_name)}</b><br><span class="note">${esc(pairName(s.task_id))} · ${fmt(s.created_at)}</span></span>
+          <span class="pill ${STATUS[s.status][0]}">${STATUS[s.status][1]}</span>
+        </div>
+        <a class="btn ghost small" href="${esc(safeUrl(s.link))}" target="_blank" rel="noopener noreferrer">Открыть работу ↗</a>
+        <span class="sub-link note">${esc(s.link)}</span>
+        ${s.comment ? `<div class="comment"><b>Студент:</b> ${esc(s.comment)}</div>` : ""}
+        ${s.teacher_note && !isOpen ? `<div class="comment"><b>Ваш комментарий:</b> ${esc(s.teacher_note)}</div>` : ""}
+        ${isOpen ? `
+          <label class="field">Комментарий студенту (увидит у себя)
+            <textarea id="note-${s.id}" rows="2" maxlength="1000">${esc(s.teacher_note)}</textarea></label>
+          <div class="row">
+            <button class="btn small" data-set="ok" data-id="${s.id}">Засчитать</button>
+            <button class="btn small ghost" data-set="redo" data-id="${s.id}">На доработку</button>
+            <span class="grow"></span>
+            ${confirmDel === s.id
+              ? `<button class="btn small" data-del-yes="${s.id}">Удалить?</button><button class="btn small ghost" data-del-no>Нет</button>`
+              : `<button class="linkbtn" data-del="${s.id}">Удалить</button>`}
+          </div>` : `<div class="row"><button class="btn small ghost" data-open="${s.id}">Проверить</button></div>`}
+      </div>`;
+    }).join("");
+
+    app.innerHTML = `
+      <div class="topbar">
+        <a class="icon-btn" href="admin.html" aria-label="К результатам тестов">←</a><span class="chip">Для преподавателя</span>
+        <span class="grow"></span>
+        <button type="button" class="icon-btn" id="refresh" aria-label="Обновить">↻</button>
+      </div>
+      <h1>Сдачи <em>отработок</em></h1>
+      <div class="chips">${MODULES.map(m => `<button type="button" class="chip ${m.id === modId ? "dark" : ""}" data-mod="${m.id}">${esc(m.title)}</button>`).join("")}</div>
+
+      <div class="stats">
+        <div class="stat"><span>Новые</span><b>${counts.new}</b></div>
+        <div class="stat"><span>На доработке</span><b>${counts.redo}</b></div>
+        <div class="stat"><span>Засчитано</span><b>${counts.ok}</b></div>
+      </div>
+
+      ${grid ? `<h2>Кто что сдал</h2>
+      <div class="table-scroll"><table><thead><tr><th>Студент</th>${pairs.map(p => `<th class="num">${esc(p.n)}</th>`).join("")}</tr></thead><tbody>${grid}</tbody></table></div>
+      <p class="note">• новая · ✓ засчитано · ↺ на доработку — по последней сдаче студента.</p>` : ""}
+
+      <div class="row">
+        <h2 class="grow">Работы</h2>
+        <div class="chips">
+          ${[["new", "новые"], ["redo", "доработка"], ["ok", "засчитано"], ["all", "все"]].map(([k, l]) =>
+            `<button type="button" class="chip ${filter === k ? "dark" : ""}" data-filter="${k}">${l}</button>`).join("")}
+        </div>
+      </div>
+      ${list.length ? `<div class="people">${cards}</div>`
+        : `<div class="card yellow"><h2>${subs.length ? "Здесь пусто" : "Пока никто не сдал"}</h2><p>${subs.length ? "В этом фильтре работ нет — загляните во «все»." : "Студенты сдают ссылку на Figma со страницы отработки. Новые работы появятся здесь."}</p></div>`}`;
+
+    app.querySelector("#refresh").onclick = () => fetchData();
+    app.querySelectorAll("[data-mod]").forEach(b => b.onclick = () => {
+      if (b.dataset.mod === modId) return;
+      modId = b.dataset.mod; open = null;
+      history.replaceState(null, "", "?m=" + encodeURIComponent(modId));
+      fetchData();
+    });
+    app.querySelectorAll("[data-filter]").forEach(b => b.onclick = () => { filter = b.dataset.filter; open = null; render(); });
+    app.querySelectorAll("[data-open]").forEach(b => b.onclick = () => { open = Number(b.dataset.open); confirmDel = null; render(); });
+    app.querySelectorAll("[data-set]").forEach(b => b.onclick = async () => {
+      const id = Number(b.dataset.id);
+      b.disabled = true;
+      try {
+        await window.quizRpc("otr_admin_review", { p_code: code, p_id: id, p_status: b.dataset.set, p_note: document.getElementById("note-" + id).value });
+        open = null; fetchData();
+      } catch (e) { b.disabled = false; b.textContent = "Не сохранилось"; }
+    });
+    app.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { confirmDel = Number(b.dataset.del); render(); });
+    app.querySelectorAll("[data-del-no]").forEach(b => b.onclick = () => { confirmDel = null; render(); });
+    app.querySelectorAll("[data-del-yes]").forEach(b => b.onclick = async () => {
+      try { await window.quizRpc("otr_admin_delete", { p_code: code, p_id: Number(b.dataset.delYes) }); open = null; confirmDel = null; fetchData(); }
+      catch (e) { b.textContent = "Не удалось"; }
+    });
+  }
+
+  // автообновление, пока ничего не открыто на проверку
+  setInterval(() => {
+    if (subs && code && open === null && document.visibilityState === "visible") fetchData(true);
+  }, 20000);
+
+  if (code) fetchData(); else login();
+})();
+</script>
+</body>
+</html>

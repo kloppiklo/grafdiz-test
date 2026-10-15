@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f0e2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Граф. дизайн">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Отработка</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap" id="app"></main>
+
+<script src="tests.js"></script>
+<script src="config.js"></script>
+<script>
+// Отработка модуля: otrabotka.html?m=m1 — обзор пар, otrabotka.html?m=m1&p=p01 — сама пара.
+// Содержимое берётся из otrabotki/<m>.js.
+(function () {
+  const params = new URLSearchParams(location.search);
+  const meta = window.OTRABOTKI.find(o => o.id === params.get("m") && o.status === "open");
+  if (!meta) { location.replace("./"); return; }
+  const s = document.createElement("script");
+  s.src = "otrabotki/" + meta.id + ".js";
+  s.onload = () => run(window.OTR, params.get("p"));
+  s.onerror = () => { document.getElementById("app").innerHTML = '<p class="error">Не удалось загрузить отработку. Обновите страницу.</p>'; };
+  document.head.appendChild(s);
+})();
+
+function run(M, pairId) {
+  const app = document.getElementById("app");
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const read = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+  const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+  const LETTERS = ["А", "Б", "В", "Г"];
+  const CHECK_KEY = "otr_" + M.id + "_check";
+  const STATUS = {
+    none: { pill: "plain", text: "не сдано" },
+    new: { pill: "wait", text: "на проверке" },
+    ok: { pill: "good", text: "засчитано" },
+    redo: { pill: "bad", text: "на доработку" }
+  };
+  const url = p => "otrabotka.html?m=" + encodeURIComponent(M.id) + (p ? "&p=" + encodeURIComponent(p) : "");
+
+  let server = {};   // id сдачи → { status, teacher_note }
+  let checks = read(CHECK_KEY) || {};
+
+  // последняя сдача по заданию и её статус
+  function latest(task) {
+    const mine = window.OtrStore.get(M.id).filter(x => x.task === task);
+    if (!mine.length) return null;
+    const last = mine[mine.length - 1];
+    const st = server[last.id] || {};
+    return Object.assign({}, last, { status: st.status || "new", note: st.teacher_note || "", count: mine.length });
+  }
+  const statusOf = task => { const l = latest(task); return l ? l.status : "none"; };
+
+  async function refreshStatus() {
+    const items = window.OtrStore.get(M.id).map(x => ({ id: x.id, token: x.token }));
+    if (!items.length) return;
+    try {
+      const rows = await window.quizRpc("otr_status", { p_items: items });
+      const fresh = {};
+      rows.forEach(r => { fresh[r.id] = r; });
+      if (JSON.stringify(fresh) === JSON.stringify(server)) return;
+      server = fresh;
+      // не перерисовываем страницу, пока студент заполняет форму сдачи
+      const link = document.getElementById("link"), comment = document.getElementById("comment");
+      if ((link && link.value) || (comment && comment.value)) return;
+      const y = window.scrollY;
+      render();
+      window.scrollTo(0, y);
+    } catch (e) { /* без сети просто показываем «на проверке» */ }
+  }
+
+  function render() {
+    app.textContent = "";
+    const pair = M.pairs.find(p => p.id === pairId);
+    if (pair) renderPair(pair); else renderOverview();
+  }
+
+  // ---------- обзор модуля ----------
+  function renderOverview() {
+    document.title = "Отработка · " + M.title;
+    const sent = M.pairs.filter(p => statusOf(p.id) !== "none").length;
+    const ok = M.pairs.filter(p => statusOf(p.id) === "ok").length;
+    const last = read("quiz_" + M.test + "_last");
+    const testPill = last
+      ? `<span class="pill ${last.score / last.total >= 0.8 ? "good" : last.score / last.total >= 0.5 ? "mid" : "bad"}">${last.score} / ${last.total}</span>`
+      : `<span class="pill plain">не пройден</span>`;
+
+    const cards = M.pairs.map(p => {
+      const st = STATUS[statusOf(p.id)];
+      const ch = checks[p.id] ? Object.keys(checks[p.id]).length : 0;
+      return `<section class="card ${p.color} test-card">
+        <div class="row"><span class="chip">Пара ${esc(p.n)}</span><span class="grow"></span><span class="pill ${st.pill}">${st.text}</span></div>
+        <h2>${esc(p.title)}</h2>
+        <div class="chips"><span class="chip ghost">${esc(p.result)}</span><span class="chip ghost">${esc(p.time)}</span>${ch ? `<span class="chip ghost">самопроверка ${ch}/${p.check.length}</span>` : ""}</div>
+        <a class="btn block" href="${url(p.id)}">${statusOf(p.id) === "none" ? "Начать" : "Открыть"} <span class="arr">→</span></a>
+      </section>`;
+    }).join("");
+
+    app.innerHTML = `
+      <div class="topbar"><a class="icon-btn" href="./" aria-label="На главную">←</a><span class="chip">${esc(M.module)}</span></div>
+      <h1>Отработка:<br><em>${esc(M.title.toLowerCase())}</em></h1>
+      <p class="muted">${esc(M.intro)}</p>
+
+      <section class="card">
+        <h2>Как проходить</h2>
+        <ol class="howto">
+          <li><b>Коротко о главном</b><span>конспект пары за 5–10 минут</span></li>
+          <li><b>Посмотри</b><span>примеры: как правильно и как нет</span></li>
+          <li><b>Проверь себя</b><span>3 вопроса, сразу видно ответ</span></li>
+          <li><b>Сделай</b><span>практика в Figma с критериями</span></li>
+          <li><b>Сдай</b><span>ссылка на Figma — преподаватель проверит</span></li>
+        </ol>
+        <p class="note">В конце — итоговый тест модуля. Пары можно проходить в любом порядке, но лучше по очереди.</p>
+      </section>
+
+      <section class="card lavender">
+        <div class="row"><p class="eyebrow grow">Ваш прогресс</p><span class="pill plain">засчитано ${ok} из ${M.pairs.length}</span></div>
+        <p class="score">${sent}<small> / ${M.pairs.length} сдано</small></p>
+        <div class="bar big"><i style="width:${Math.round(sent / M.pairs.length * 100)}%"></i></div>
+      </section>
+
+      ${cards}
+
+      <section class="card peach test-card">
+        <div class="row"><span class="chip">Финал</span><span class="grow"></span>${testPill}</div>
+        <h2>Итоговый тест модуля</h2>
+        <p>10 вопросов по всем четырём парам. Результат увидит преподаватель.</p>
+        <a class="btn block" href="test.html?t=${encodeURIComponent(M.test)}">${last ? "Пройти ещё раз" : "Пройти тест"} <span class="arr">→</span></a>
+      </section>`;
+  }
+
+  // ---------- одна пара ----------
+  function block(b) {
+    let html = `<div class="sum-block"><h3>${esc(b.h)}</h3>`;
+    if (b.flow) html += `<div class="flow">${b.flow.map(x => `<span class="chip">${esc(x)}</span>`).join('<span class="flow-arr" aria-hidden="true">→</span>')}</div>`;
+    if (b.p) html += `<p>${esc(b.p)}</p>`;
+    if (b.terms) html += `<div class="terms">${b.terms.map(([k, v]) => `<div class="term"><b>${esc(k)}</b><span>${esc(v)}</span></div>`).join("")}</div>`;
+    if (b.list) html += `<ul class="blist">${b.list.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`;
+    return html + `</div>`;
+  }
+
+  function checkHtml(p) {
+    const answers = checks[p.id] || {};
+    return p.check.map((c, qi) => {
+      const a = answers[qi];
+      const done = a !== undefined;
+      const opts = c.options.map((o, i) => {
+        let cls = "", mark = "›";
+        if (done) {
+          if (i === c.correct) { cls = "right"; mark = "✓"; }
+          else if (i === a) { cls = "wrong"; mark = "✗"; }
+          else { cls = "dim"; mark = ""; }
+        }
+        return `<button type="button" class="opt ${cls}" data-q="${qi}" data-i="${i}" ${done ? "disabled" : ""}>
+          <span class="key">${LETTERS[i]}</span><span class="txt">${esc(o)}</span><span class="chev" aria-hidden="true">${mark}</span></button>`;
+      }).join("");
+      const fb = done ? `<div class="feedback ${a === c.correct ? "ok" : "no"}" role="status">
+          <div class="verdict"><span class="dot" aria-hidden="true">${a === c.correct ? "✓" : "✗"}</span>${a === c.correct ? "Верно" : "Неверно"}</div>
+          <p>${esc(c.why)}</p></div>` : "";
+      return `<div class="self-q"><p class="q-text"><b>${qi + 1}.</b> ${esc(c.q)}</p><div class="options">${opts}</div>${fb}</div>`;
+    }).join("");
+  }
+
+  function renderPair(p) {
+    document.title = "Пара " + p.n + " · " + p.title;
+    const idx = M.pairs.indexOf(p);
+    const next = M.pairs[idx + 1];
+    const who = window.Student.get();
+    const l = latest(p.id);
+    const T = p.task;
+
+    const history = l ? `
+      <div class="sub-status ${l.status}">
+        <div class="row"><b class="grow">Ваша сдача${l.count > 1 ? " (попытка " + l.count + ")" : ""}</b><span class="pill ${STATUS[l.status].pill}">${STATUS[l.status].text}</span></div>
+        <a class="sub-link" href="${esc(l.link)}" target="_blank" rel="noopener noreferrer">${esc(l.link)}</a>
+        ${l.note ? `<p><b>Комментарий преподавателя:</b> ${esc(l.note)}</p>` : ""}
+        <p class="note">${l.status === "redo" ? "Исправьте работу по комментарию и сдайте ссылку ещё раз." : l.status === "ok" ? "Работа засчитана. Можно идти дальше." : "Преподаватель ещё не проверил работу. Статус обновится сам."}</p>
+      </div>` : "";
+
+    app.innerHTML = `
+      <div class="topbar"><a class="icon-btn" href="${url()}" aria-label="К списку пар">←</a><span class="chip">Пара ${esc(p.n)} из ${M.pairs.length}</span><span class="chip">${esc(M.module.split(" · ")[0])}</span></div>
+      <h1 class="h1-pair">${esc(p.title)}</h1>
+      <nav class="chips sec-nav" aria-label="Шаги">
+        <a class="chip" href="#s1">1 · Главное</a><a class="chip" href="#s2">2 · Посмотри</a><a class="chip" href="#s3">3 · Проверь</a><a class="chip" href="#s4">4 · Сделай</a><a class="chip" href="#s5">5 · Сдай</a>
+      </nav>
+
+      <section class="card" id="s1">
+        <div class="sec-head"><span class="sec-num">1</span><h2>Коротко о главном</h2></div>
+        ${p.summary.map(block).join("")}
+      </section>
+
+      <section class="card ${p.color}" id="s2">
+        <div class="sec-head"><span class="sec-num">2</span><h2>Посмотри</h2></div>
+        <div class="examples">${p.examples.map(e => `<figure>${e.svg}<figcaption>${esc(e.cap)}</figcaption></figure>`).join("")}</div>
+        <div class="look"><b>Упражнение на взгляд.</b> ${esc(p.look)}</div>
+      </section>
+
+      <section class="card" id="s3">
+        <div class="sec-head"><span class="sec-num">3</span><h2>Проверь себя</h2></div>
+        <p class="note">Тренировка: ответы никуда не отправляются, можно пробовать сколько угодно.</p>
+        <div id="checks">${checkHtml(p)}</div>
+        <button type="button" class="btn ghost small" id="reset-check" ${checks[p.id] ? "" : "hidden"}>Пройти вопросы заново</button>
+      </section>
+
+      <section class="card ${p.color}" id="s4">
+        <div class="sec-head"><span class="sec-num">4</span><h2>Сделай</h2></div>
+        <h3 class="task-title">${esc(T.title)}</h3>
+        <p>${esc(T.brief)}</p>
+        ${T.words ? `<div class="sub-box"><b>Слова на выбор</b><div class="chips">${T.words.map(w => `<span class="chip">${esc(w)}</span>`).join("")}</div></div>` : ""}
+        ${T.text ? `<div class="sub-box"><b>Текст для макета</b><div class="copy-text">${T.text.map(x => `<p>${esc(x)}</p>`).join("")}</div></div>` : ""}
+        <div class="sub-box"><b>Ограничения</b><ul class="blist">${T.limits.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+        <div class="sub-box"><b>Порядок работы</b><ol class="steps-list">${T.steps.map(x => `<li>${esc(x)}</li>`).join("")}</ol></div>
+        <div class="sub-box"><b>Работа засчитывается, если</b><ul class="crit">${T.criteria.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+        <div class="sub-box"><b>Что понадобится в Figma</b><div class="chips">${p.figma.map(x => `<span class="chip ghost-w">${esc(x)}</span>`).join("")}</div></div>
+      </section>
+
+      <section class="card lavender" id="s5">
+        <div class="sec-head"><span class="sec-num">5</span><h2>Сдай</h2></div>
+        ${history}
+        <div class="look"><b>Как получить ссылку.</b> В Figma нажмите <b>Share</b> → в поле доступа выберите <b>Anyone with the link · can view</b> → <b>Copy link</b>. Все фреймы задания — в одном файле.</div>
+        <form class="sub-form" id="sub" novalidate>
+          <div class="two">
+            <label class="field" for="first">Имя<input type="text" id="first" autocomplete="given-name" maxlength="60" value="${esc(who.first)}"></label>
+            <label class="field" for="last">Фамилия<input type="text" id="last" autocomplete="family-name" maxlength="60" value="${esc(who.last)}"></label>
+          </div>
+          <label class="field" for="link">Ссылка на работу<input type="url" id="link" inputmode="url" placeholder="https://www.figma.com/design/…" maxlength="500"></label>
+          <label class="field" for="comment">Комментарий (необязательно)<textarea id="comment" rows="3" maxlength="1000" placeholder="Что получилось, что было сложно"></textarea></label>
+          <p class="error" id="sub-err" hidden></p>
+          <button class="btn block" type="submit" id="send">${l ? "Сдать ещё раз" : "Сдать работу"} <span class="arr">→</span></button>
+        </form>
+      </section>
+
+      ${next
+        ? `<a class="btn block" href="${url(next.id)}">Дальше: пара ${esc(next.n)} <span class="arr">→</span></a>`
+        : `<a class="btn block" href="test.html?t=${encodeURIComponent(M.test)}">Итоговый тест модуля <span class="arr">→</span></a>`}
+      <a class="btn ghost block" href="${url()}">Все пары модуля</a>`;
+
+    // самопроверка
+    app.querySelector("#checks").addEventListener("click", e => {
+      const b = e.target.closest(".opt");
+      if (!b || b.disabled) return;
+      const q = Number(b.dataset.q), i = Number(b.dataset.i);
+      checks[p.id] = checks[p.id] || {};
+      checks[p.id][q] = i;
+      write(CHECK_KEY, checks);
+      app.querySelector("#checks").innerHTML = checkHtml(p);
+      app.querySelector("#reset-check").hidden = false;
+    });
+    app.querySelector("#reset-check").addEventListener("click", () => {
+      delete checks[p.id]; write(CHECK_KEY, checks);
+      app.querySelector("#checks").innerHTML = checkHtml(p);
+      app.querySelector("#reset-check").hidden = true;
+    });
+
+    // сдача
+    const form = app.querySelector("#sub"), err = app.querySelector("#sub-err"), btn = app.querySelector("#send");
+    let busy = false;
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      if (busy) return;
+      const first = form.first.value.trim(), last = form.last.value.trim();
+      const link = form.link.value.trim(), comment = form.comment.value.trim();
+      const fail = t => { err.hidden = false; err.textContent = t; };
+      if (!first || !last) return fail("Впишите имя и фамилию, чтобы преподаватель понял, чья это работа.");
+      if (!/^https?:\/\/\S+$/i.test(link)) return fail("Вставьте ссылку целиком — она начинается с https://");
+      busy = true; btn.disabled = true; btn.textContent = "Отправляем…"; err.hidden = true;
+      try {
+        const r = await window.quizRpc("otr_submit", { p_module: M.id, p_task: p.id, p_first_name: first, p_last_name: last, p_link: link, p_comment: comment });
+        window.Student.set(first, last);
+        window.OtrStore.add(M.id, { id: r.id, token: r.token, task: p.id, link, at: r.created_at });
+        server[r.id] = { status: "new", teacher_note: "" };
+        render();
+        const st = document.getElementById("s5");
+        if (st) st.scrollIntoView({ block: "start" });
+      } catch (ex) {
+        busy = false; btn.disabled = false; btn.innerHTML = 'Сдать работу <span class="arr">→</span>';
+        fail(/bad link/.test(ex.message) ? "Ссылка не подходит. Скопируйте её из Figma кнопкой Copy link." : "Работа не отправилась. Проверьте интернет и попробуйте ещё раз.");
+      }
+    });
+  }
+
+  render();
+  refreshStatus();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refreshStatus(); });
+}
+</script>
+</body>
+</html>

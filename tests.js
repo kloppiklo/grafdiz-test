@@ -20,6 +20,12 @@ window.TESTS = [
   { id: "module6", status: "soon", color: "blue", title: "Айдентика", module: "Модуль 6 · пары 29–32" }
 ];
 
+// Отработки пропущенных занятий: содержимое в otrabotki/<id>.js, страница otrabotka.html?m=<id>.
+// Сданные работы лежат в базе (quiz.submissions), проверка — в admin-otr.html.
+window.OTRABOTKI = [
+  { id: "m1", status: "open", color: "yellow", title: "Визуальное мышление", module: "Модуль 1 · пары 01–04", pairs: 4 }
+];
+
 // Имя студента запоминается на устройстве для всех тестов
 window.Student = {
   KEY: "quiz_student",
@@ -27,6 +33,13 @@ window.Student = {
   set(first, last) { try { localStorage.setItem(this.KEY, JSON.stringify({ first, last })); } catch (e) {} }
 };
 window.quizStoreKey = id => "quiz_" + id + "_v2";
+
+// Сдачи отработок на этом устройстве: [{ id, token, task, link, at }] — по ним студент видит статус проверки
+window.OtrStore = {
+  key: m => "otr_" + m + "_subs",
+  get(m) { try { return JSON.parse(localStorage.getItem(this.key(m))) || []; } catch (e) { return []; } },
+  add(m, item) { const list = this.get(m); list.push(item); try { localStorage.setItem(this.key(m), JSON.stringify(list)); } catch (e) {} return list; }
+};
 
 // Приложение на телефоне: регистрируем service worker (см. sw.js)
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
