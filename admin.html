@@ -7,7 +7,7 @@
 <title>Результаты · Визуальное мышление</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -30,13 +30,14 @@
 
   function login(errText) {
     app.innerHTML = `
-      <div><p class="eyebrow">${esc(Q.module)}</p><h1>Результаты теста</h1></div>
-      <form class="sheet" id="login" style="max-width:420px" novalidate>
+      <div class="chips"><span class="chip">${esc(Q.module)}</span></div>
+      <h1>Результаты <em>теста</em></h1>
+      <form class="card login" id="login" novalidate>
         <label class="field" for="code">Код преподавателя
           <input type="password" id="code" autocomplete="current-password" required>
         </label>
         <p class="error" ${errText ? "" : "hidden"}>${esc(errText || "")}</p>
-        <button class="btn" type="submit">Открыть результаты</button>
+        <button class="btn block" type="submit">Открыть результаты <span class="arr">→</span></button>
       </form>`;
     document.getElementById("login").addEventListener("submit", e => {
       e.preventDefault();
@@ -90,7 +91,7 @@
       }
       return `<tr class="person" data-id="${s.id}">
         <td>${esc(s.last_name)} ${esc(s.first_name)}</td>
-        <td class="num"><span class="pill ${isDone ? pillCls(p) : "mid"}">${s.score} / ${total}</span></td>
+        <td class="num"><span class="pill ${isDone ? pillCls(p) : "wait"}">${s.score} / ${total}</span></td>
         <td class="note">${isDone ? "готово" : "отвечает: " + s.answered + " из " + total}</td>
         <td class="num hide-sm">${fmt(s.last_at || s.created_at)}</td>
         <td class="note hide-sm">${isOpen ? "Скрыть" : "Ответы"}</td>
@@ -107,14 +108,14 @@
 
     app.innerHTML = `
       <div class="row">
-        <div class="grow"><p class="eyebrow">${esc(Q.module)}</p><h1>Результаты теста</h1></div>
+        <div class="grow"><div class="chips" style="margin-bottom:12px"><span class="chip">${esc(Q.module)}</span></div><h1>Результаты <em>теста</em></h1></div>
         <button class="btn ghost small" id="refresh">Обновить</button>
       </div>
       <p class="note">Обновляется само каждые 15 секунд.</p>
       <div class="stats">
-        <div class="stat"><span class="note">Завершили</span><b>${finished.length}</b></div>
-        <div class="stat"><span class="note">В процессе</span><b>${inProgress}</b></div>
-        <div class="stat"><span class="note">Средний балл</span><b>${finished.length ? avg.toFixed(1) : "—"}<span class="note"> / ${total}</span></b></div>
+        <div class="stat"><span>Завершили</span><b>${finished.length}</b></div>
+        <div class="stat"><span>В процессе</span><b>${inProgress}</b></div>
+        <div class="stat"><span>Средний балл</span><b>${finished.length ? avg.toFixed(1) : "—"}<span class="note"> / ${total}</span></b></div>
       </div>
       <div class="row">
         <h2 class="grow">Студенты</h2>
@@ -126,10 +127,10 @@
       ${subs.length ? `<div class="table-scroll"><table>
         <thead><tr><th>Студент</th><th>Верно</th><th>Статус</th><th class="hide-sm">Последний ответ</th><th class="hide-sm"></th></tr></thead>
         <tbody>${rows}</tbody></table></div>`
-      : `<div class="sheet"><p>Пока никто не начал тест.</p><p class="muted">Отправьте студентам ссылку на тест. Каждый ответ появляется здесь сразу, как только студент его отправил.</p></div>`}
+      : `<div class="card yellow"><h2>Пока никто не начал тест</h2><p class="muted">Отправьте студентам ссылку на тест. Каждый ответ появляется здесь сразу, как только студент его отправил.</p></div>`}
       <h2>Какие вопросы даются сложнее</h2>
       <p class="muted">Доля верных ответов среди тех, кто уже ответил на вопрос.</p>
-      <div>${qstats}</div>`;
+      <div class="qstats">${qstats}</div>`;
 
     app.querySelector("#refresh").addEventListener("click", () => fetchData());
     app.querySelectorAll("[data-sort]").forEach(b => b.addEventListener("click", () => { sortBy = b.dataset.sort; render(); }));

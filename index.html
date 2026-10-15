@@ -6,7 +6,7 @@
 <title>Тест · Визуальное мышление</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -53,23 +53,36 @@
   function go(step) { state.step = step; save(); render(); window.scrollTo(0, 0); }
   function render() { app.textContent = ""; ({ start, question, done })[state.step](); }
 
+  // «цветок» из референса: окружность с 10 мягкими лепестками
+  const FLOWER = (() => {
+    const pts = [];
+    for (let i = 0; i < 160; i++) {
+      const t = i / 160 * Math.PI * 2, r = 42 + 7 * Math.cos(10 * t);
+      pts.push((50 + r * Math.cos(t)).toFixed(2) + " " + (50 + r * Math.sin(t)).toFixed(2));
+    }
+    return '<svg viewBox="0 0 100 100" aria-hidden="true"><path fill="var(--pink)" d="M' + pts.join(" L") + 'Z"/></svg>';
+  })();
+
   function start() {
     app.append(el(`
-      <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-      <div>
-        <p class="eyebrow">${esc(Q.module)}</p>
-        <h1>${esc(Q.title)}</h1>
+      <div class="chips"><span class="chip">${esc(Q.module)}</span><span class="chip">${Q.questions.length} вопросов</span></div>
+      <h1>Визуальное<br><em>мышление:</em><br>проверь себя</h1>
+      <div class="hero-art" aria-hidden="true">
+        <div class="shape flower">${FLOWER}<span>Композиция<small>пара 02</small></span></div>
+        <div class="shape square"><span>Контраст<small>пара 03</small></span></div>
+        <div class="shape circle"><span>Иерархия<small>пара 04</small></span></div>
+        <p class="hero-note">После каждого ответа сразу увидите, верно ли, и короткое пояснение.</p>
       </div>
-      <p class="muted">${Q.questions.length} вопросов по теории: композиция, баланс, визуальный центр, контраст и иерархия. После каждого ответа вы сразу увидите, верно ли, и короткое пояснение. Изменить отправленный ответ нельзя.</p>
-      <form class="sheet" id="who" novalidate>
+      <form class="card" id="who" novalidate>
         <label class="field" for="first">Имя
           <input type="text" id="first" autocomplete="given-name" maxlength="60" required>
         </label>
         <label class="field" for="last">Фамилия
           <input type="text" id="last" autocomplete="family-name" maxlength="60" required>
         </label>
+        <p class="note">Отправленный ответ изменить нельзя.</p>
         <p class="error" id="who-err" hidden></p>
-        <button class="btn" type="submit" id="go">Начать тест</button>
+        <button class="btn block" type="submit" id="go">Начать <span class="arr">→</span></button>
       </form>
     `));
     const f = document.getElementById("first"), l = document.getElementById("last");
@@ -89,8 +102,8 @@
         busy = false;
         go("question");
       } catch (ex) {
-        busy = false; btn.disabled = false; btn.textContent = "Начать тест";
-        err.hidden = false; err.textContent = "Не получилось начать тест. Проверьте интернет и нажмите «Начать тест» ещё раз.";
+        busy = false; btn.disabled = false; btn.innerHTML = 'Начать <span class="arr">→</span>';
+        err.hidden = false; err.textContent = "Не получилось начать тест. Проверьте интернет и нажмите «Начать» ещё раз.";
       }
     });
   }
@@ -101,41 +114,46 @@
     const res = state.results[q.id];
     const last = state.idx === total - 1;
 
-    const bars = Q.questions.map((qq, i) => {
+    const COLORS = ["yellow", "pink", "lavender", "mint", "peach", "blue"];
+    const color = COLORS[state.idx % COLORS.length];
+
+    const steps = Q.questions.map((qq, i) => {
       const r = state.results[qq.id];
-      return `<span class="${r ? (r.correct ? "ok" : "no") : (i === state.idx ? "now" : "")}"></span>`;
+      return `<span class="${i === state.idx ? "now" : r ? (r.correct ? "ok" : "no") : ""}">${i + 1}</span>`;
     }).join("");
 
     const opts = state.order[q.id].map((k, i) => {
-      let cls = "", checked = choice === k;
+      let cls = "", checked = choice === k, mark = "›";
       if (res) {
-        if (k === res.correct_option) cls = "right";
-        else if (k === res.answer) cls = "wrong";
-        else cls = "dim";
+        if (k === res.correct_option) { cls = "right"; mark = "✓"; }
+        else if (k === res.answer) { cls = "wrong"; mark = "✗"; }
+        else { cls = "dim"; mark = ""; }
         checked = k === res.answer;
       }
       return `<button type="button" class="opt ${cls}" role="radio" aria-checked="${checked}" data-k="${k}" ${res ? "disabled" : ""}>
-        <span class="key">${LETTERS[i]}</span><span>${esc(q.options[k])}</span>
+        <span class="key">${LETTERS[i]}</span><span class="txt">${esc(q.options[k])}</span><span class="chev" aria-hidden="true">${mark}</span>
       </button>`;
     }).join("");
 
     const feedback = res ? `
       <div class="feedback ${res.correct ? "ok" : "no"}" role="status">
-        <b>${res.correct ? "Верно" : "Неверно"}</b>
-        ${res.correct ? "" : `<p>Правильный ответ: ${esc(q.options[res.correct_option])}</p>`}
+        <div class="verdict"><span class="dot" aria-hidden="true">${res.correct ? "✓" : "✗"}</span>${res.correct ? "Верно" : "Неверно"}</div>
+        ${res.correct ? "" : `<p class="right-answer">Правильно: ${esc(q.options[res.correct_option])}</p>`}
         <p>${esc(res.explanation)}</p>
       </div>` : "";
 
     const action = res
-      ? `<button type="button" class="btn" id="next">${last ? "Посмотреть результат" : "Следующий вопрос"}</button>`
-      : `<button type="button" class="btn" id="answer" ${choice ? "" : "disabled"}>Ответить</button>`;
+      ? `<button type="button" class="btn block" id="next">${last ? "Посмотреть результат" : "Следующий вопрос"} <span class="arr">→</span></button>`
+      : `<button type="button" class="btn block" id="answer" ${choice ? "" : "disabled"}>Ответить <span class="arr">→</span></button>`;
 
     app.append(el(`
-      <p class="eyebrow">Вопрос ${state.idx + 1} из ${total} · ${esc(q.topic)}</p>
-      <div class="progress" style="grid-template-columns: repeat(${total}, 1fr)" aria-hidden="true">${bars}</div>
-      <h2>${esc(q.text)}</h2>
-      <div class="options" role="radiogroup" aria-label="Варианты ответа">${opts}</div>
-      ${feedback}
+      <div class="row"><span class="chip dark">Вопрос ${state.idx + 1} из ${total}</span><span class="chip">${esc(q.topic)}</span></div>
+      <div class="steps" aria-hidden="true">${steps}</div>
+      <section class="card ${color}">
+        <h2>${esc(q.text)}</h2>
+        <div class="options" role="radiogroup" aria-label="Варианты ответа">${opts}</div>
+        ${feedback}
+      </section>
       <p class="error" id="ans-err" hidden></p>
       ${action}
     `));
@@ -169,7 +187,7 @@
         const next = document.getElementById("next");
         if (next) next.scrollIntoView({ block: "end", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
       } catch (ex) {
-        busy = false; answerBtn.disabled = false; answerBtn.textContent = "Ответить";
+        busy = false; answerBtn.disabled = false; answerBtn.innerHTML = 'Ответить <span class="arr">→</span>';
         const err = document.getElementById("ans-err");
         err.hidden = false;
         err.textContent = "Ответ не отправился. Проверьте интернет и нажмите «Ответить» ещё раз.";
@@ -179,21 +197,29 @@
 
   function done() {
     const total = Q.questions.length;
+    const sc = score();
+    const C = 2 * Math.PI * 46;
     const list = Q.questions.map((q, i) => {
       const r = state.results[q.id] || {};
       return `<div class="qitem ${r.correct ? "ok" : "no"}"><span class="mk">${r.correct ? "✓" : "✗"}</span><span>${i + 1}. ${esc(q.text)}</span></div>`;
     }).join("");
     app.append(el(`
-      <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-      <div>
-        <p class="eyebrow">${esc(state.first)} ${esc(state.last)}</p>
-        <h1>Тест пройден</h1>
-      </div>
-      <div class="sheet">
-        <p class="eyebrow">Ваш результат</p>
-        <p class="score">${score()}<small> / ${total}</small></p>
-        <p class="muted">Преподаватель уже видит ваши ответы.</p>
-      </div>
+      <div class="chips"><span class="chip">${esc(state.first)} ${esc(state.last)}</span></div>
+      <h1>Тест <em>пройден</em></h1>
+      <section class="card lavender">
+        <div class="result">
+          <div>
+            <p class="eyebrow">Ваш результат</p>
+            <p class="score">${sc}<small> / ${total}</small></p>
+          </div>
+          <svg class="ring" viewBox="0 0 116 116" role="img" aria-label="${Math.round(sc / total * 100)}% верных">
+            <circle class="track" cx="58" cy="58" r="46"></circle>
+            <circle class="val" cx="58" cy="58" r="46" stroke-dasharray="${C * sc / total} ${C}"></circle>
+            <text x="58" y="66" text-anchor="middle">${Math.round(sc / total * 100)}%</text>
+          </svg>
+        </div>
+        <p>Преподаватель уже видит ваши ответы.</p>
+      </section>
       <div class="summary">${list}</div>
     `));
   }
