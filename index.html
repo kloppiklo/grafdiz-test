@@ -18,63 +18,279 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="wrap" id="app"></main>
+<main class="wrap" id="app" aria-live="polite"></main>
+<nav class="tabbar" id="tabbar" hidden></nav>
 
 <script src="tests.js"></script>
 <script>
+// Главная-приложение: при первом запуске — welcome и знакомство (имя хранится на телефоне),
+// дальше — четыре вкладки: тесты, теория, прогресс, профиль. Вкладка — в адресе (#theory и т. п.).
 (function () {
   const app = document.getElementById("app");
+  const bar = document.getElementById("tabbar");
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const read = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
-  const who = window.Student.get();
+  const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+  const ONBOARDED = "quiz_onboarded";
+  const OPEN = window.TESTS.filter(t => t.status === "open");
+  const SOON = window.TESTS.filter(t => t.status !== "open");
+  const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-  function status(t) {
+  // Android/Chrome отдают системное окно установки — сохраняем его до нажатия кнопки
+  let installPrompt = null;
+  window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installPrompt = e; });
+
+  const FLOWER = (() => {
+    const pts = [];
+    for (let i = 0; i < 160; i++) {
+      const t = i / 160 * Math.PI * 2, r = 42 + 7 * Math.cos(10 * t);
+      pts.push((50 + r * Math.cos(t)).toFixed(2) + " " + (50 + r * Math.sin(t)).toFixed(2));
+    }
+    return '<svg viewBox="0 0 100 100" aria-hidden="true"><path fill="var(--pink)" d="M' + pts.join(" L") + 'Z"/></svg>';
+  })();
+
+  const ICONS = {
+    tests: '<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',
+    theory: '<path d="M4 5h7a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4zM20 5h-7a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h7z"/>',
+    progress: '<path d="M5 19V11M12 19V5M19 19v-6"/>',
+    profile: '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6"/>'
+  };
+  const TABS = [["tests", "Тесты"], ["theory", "Теория"], ["progress", "Прогресс"], ["profile", "Профиль"]];
+
+  // ---------- данные о прохождении (всё — на этом устройстве)
+  function inProgress(t) {
     const st = read(window.quizStoreKey(t.id));
-    const last = read("quiz_" + t.id + "_last");
-    if (st && st.attempt && st.step !== "done") {
-      const n = Object.keys(st.results || {}).length;
-      return { pill: `<span class="pill wait">отвечено ${n} из ${t.count}</span>`, cta: "Продолжить" };
-    }
-    if (last) {
-      const p = last.score / last.total;
-      const cls = p >= 0.8 ? "good" : p >= 0.5 ? "mid" : "bad";
-      return { pill: `<span class="pill ${cls}">последний результат ${last.score} / ${last.total}</span>`, cta: "Пройти ещё раз", again: true };
-    }
-    return { pill: `<span class="pill plain">${t.count} вопросов</span>`, cta: "Начать" };
+    return st && st.attempt && st.step !== "done" ? Object.keys(st.results || {}).length : null;
+  }
+  function best(t) { return read("quiz_" + t.id + "_best") || read("quiz_" + t.id + "_last"); }
+  const pct = r => r.score / r.total;
+  const cls = r => pct(r) >= 0.8 ? "good" : pct(r) >= 0.5 ? "mid" : "bad";
+
+  // ---------- welcome + знакомство
+  let slide = 0;
+  function welcome(fromProfile) {
+    bar.hidden = true; document.body.classList.remove("has-tabs");
+    const slides = [
+      () => `
+        <div class="hero-art" aria-hidden="true">
+          <div class="shape flower">${FLOWER}</div><div class="shape square"></div><div class="shape circle"></div>
+        </div>
+        <h1>Графический<br><em>дизайн</em></h1>
+        <p class="muted">Проверяйте себя после каждой темы курса: короткие тесты, теория и ваш прогресс — в одном приложении.</p>`,
+      () => `
+        <h1>Как это<br><em>работает</em></h1>
+        <div class="stepcard"><span class="n" style="background:var(--yellow)">1</span><p>Выбираете ответ<small>10–12 вопросов, один верный вариант</small></p></div>
+        <div class="stepcard"><span class="n" style="background:var(--pink)">2</span><p>Сразу видите, верно ли<small>и короткое пояснение к вопросу</small></p></div>
+        <div class="stepcard"><span class="n" style="background:var(--blue)">3</span><p>Результат у преподавателя<small>можно пересдать, если хочется лучше</small></p></div>
+        <div class="stepcard"><span class="n" style="background:var(--mint)">✦</span><p>Перед тестом — теория<small>презентация с занятия всегда под рукой</small></p></div>`,
+      () => `
+        <h1>Иконка<br><em>на экране</em></h1>
+        <p class="muted">Добавьте приложение на экран «Домой» — и тесты будут в одно касание.</p>
+        <div class="center"><img class="appicon" src="icons/icon-192.png" alt=""></div>
+        ${installBlock()}`
+    ];
+    // шаг «установка» не нужен, если приложение уже стоит на экране
+    const list = isStandalone() ? slides.slice(0, 2) : slides;
+    if (slide >= list.length) return register(fromProfile);
+    const last = slide === list.length - 1;
+    app.innerHTML = `
+      <div class="welcome">
+        <div class="topbar between">${slide > 0 ? '<button class="icon-btn" id="back" aria-label="Назад">←</button>' : "<span></span>"}
+          <button class="linkbtn" id="skip">Пропустить</button></div>
+        ${list[slide]()}
+        <div class="grow-sp"></div>
+        <div class="dots">${list.map((_, i) => `<i class="${i === slide ? "on" : ""}"></i>`).join("")}</div>
+        <button class="btn block" id="next">${last ? "Понятно" : "Дальше"} <span class="arr">→</span></button>
+      </div>`;
+    document.getElementById("next").onclick = () => { slide++; welcome(fromProfile); };
+    document.getElementById("skip").onclick = () => { slide = list.length; welcome(fromProfile); };
+    const back = document.getElementById("back");
+    if (back) back.onclick = () => { slide--; welcome(fromProfile); };
+    bindInstall();
+    window.scrollTo(0, 0);
   }
 
-  const open = window.TESTS.filter(t => t.status === "open").map(t => {
-    const s = status(t);
-    return `<section class="card ${t.color} test-card">
-      <div class="row"><span class="chip">${esc(t.module)}</span>${s.pill}</div>
-      <h2>${esc(t.title)}</h2>
-      ${t.topics ? `<div class="chips">${t.topics.map(x => `<span class="chip ghost">${esc(x)}</span>`).join("")}</div>` : ""}
-      ${t.theory ? `<a class="btn ghost block" href="theory.html?t=${encodeURIComponent(t.id)}">Теория: презентация</a>` : ""}
-      <a class="btn block" href="test.html?t=${encodeURIComponent(t.id)}" data-id="${esc(t.id)}" ${s.again ? "data-again" : ""}>${s.cta} <span class="arr">→</span></a>
-    </section>`;
-  }).join("");
+  function installBlock() {
+    if (isStandalone()) return `<p class="note">Приложение уже установлено на этом устройстве.</p>`;
+    if (isIOS) return `
+      <div class="ios">
+        <div class="r"><span class="ic">⇪</span><span>Нажмите <b>«Поделиться»</b> в Safari</span></div>
+        <div class="r"><span class="ic">＋</span><span>Выберите <b>«На экран „Домой“»</b></span></div>
+        <div class="r"><span class="ic">✓</span><span>Нажмите <b>«Добавить»</b></span></div>
+      </div>`;
+    return `
+      <button class="btn ghost block" id="install">Установить приложение</button>
+      <p class="note" id="install-note">Если кнопка не сработала: меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран».</p>`;
+  }
+  function bindInstall() {
+    const b = document.getElementById("install");
+    if (!b) return;
+    b.onclick = async () => {
+      if (!installPrompt) { document.getElementById("install-note").classList.add("strong"); return; }
+      installPrompt.prompt();
+      try { await installPrompt.userChoice; } catch (e) {}
+      installPrompt = null;
+    };
+  }
 
-  const soon = window.TESTS.filter(t => t.status !== "open").map(t => `
-    <div class="soon-row">
-      <span class="dot-c" style="background: var(--${t.color})"></span>
-      <div class="grow"><b>${esc(t.title)}</b><br><span class="note">${esc(t.module)}</span></div>
-      <span class="pill plain">скоро</span>
-    </div>`).join("");
+  function register(fromProfile) {
+    bar.hidden = true; document.body.classList.remove("has-tabs");
+    const who = window.Student.get();
+    app.innerHTML = `
+      <div class="welcome">
+        <div class="topbar">${fromProfile ? '<button class="icon-btn" id="cancel" aria-label="Назад">←</button>' : ""}</div>
+        <h1>${fromProfile ? "Ваше<br><em>имя</em>" : "Давайте<br><em>знакомиться</em>"}</h1>
+        <p class="muted">Так преподаватель увидит, чей это результат. Вводится один раз.</p>
+        <form class="card pink" id="reg" novalidate>
+          <label class="field" for="first">Имя<input type="text" id="first" autocomplete="given-name" maxlength="60" value="${esc(who.first)}"></label>
+          <label class="field" for="last">Фамилия<input type="text" id="last" autocomplete="family-name" maxlength="60" value="${esc(who.last)}"></label>
+          <p class="error" id="reg-err" hidden>Впишите имя и фамилию.</p>
+          <button class="btn block" type="submit">${fromProfile ? "Сохранить" : "Начать"} <span class="arr">→</span></button>
+        </form>
+        <p class="note">Без пароля и почты. Имя можно поменять в профиле.</p>
+      </div>`;
+    const cancel = document.getElementById("cancel");
+    if (cancel) cancel.onclick = () => show("profile");
+    document.getElementById("reg").addEventListener("submit", e => {
+      e.preventDefault();
+      const first = document.getElementById("first").value.trim();
+      const last = document.getElementById("last").value.trim();
+      if (!first || !last) { document.getElementById("reg-err").hidden = false; return; }
+      window.Student.set(first, last);
+      write(ONBOARDED, true);
+      show(fromProfile ? "profile" : "tests");
+    });
+  }
 
-  app.innerHTML = `
-    <div class="topbar"><span class="chip">${who.first ? "Привет, " + esc(who.first) + "!" : "Курс графического дизайна"}</span></div>
-    <h1>Тесты<br><em>по темам</em></h1>
-    <p class="muted">Выберите тест. После каждого ответа сразу увидите, верно ли, а результат попадёт к преподавателю.</p>
-    ${open}
-    <h2 style="margin-top:8px">Дальше по курсу</h2>
-    <div class="soon">${soon}</div>
-    <a class="btn ghost block admin-link" href="admin.html">Вход для преподавателя</a>
-  `;
+  // ---------- вкладки
+  function renderBar(active) {
+    bar.hidden = false;
+    bar.innerHTML = TABS.map(([id, label]) => `
+      <a class="tab ${id === active ? "on" : ""}" href="#${id}" ${id === active ? 'aria-current="page"' : ""}>
+        <span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id]}</svg></span>${label}</a>`).join("");
+  }
 
-  // «Пройти ещё раз» с главной: сбрасываем прошлое прохождение на этом устройстве
-  app.querySelectorAll("[data-again]").forEach(a => a.addEventListener("click", () => {
-    try { localStorage.removeItem(window.quizStoreKey(a.dataset.id)); } catch (e) {}
-  }));
+  function testsTab() {
+    const who = window.Student.get();
+    const cont = OPEN.find(t => inProgress(t) !== null);
+    const contCard = cont ? `
+      <section class="mini dark">
+        <div class="top"><span class="pill ondark">Продолжить</span><span class="note ondark">${inProgress(cont)} из ${cont.count}</span></div>
+        <h3>${esc(cont.title)}</h3>
+        <div class="bar ondark"><i style="width:${Math.round(inProgress(cont) / cont.count * 100)}%;background:var(--${cont.color})"></i></div>
+        <a class="btn block light" href="test.html?t=${encodeURIComponent(cont.id)}">Продолжить тест <span class="arr">→</span></a>
+      </section>` : "";
+    const cards = OPEN.filter(t => t !== cont).map(t => {
+      const r = best(t);
+      const pill = r ? `<span class="pill ${cls(r)}">${r.score} / ${r.total}</span>` : `<span class="pill plain">${t.count} вопросов</span>`;
+      return `
+      <section class="mini" style="background:var(--${t.color})">
+        <div class="top"><span class="pill plain">${esc(t.module)}</span>${pill}</div>
+        <h3>${esc(t.title)}</h3>
+        <div class="row">
+          ${t.theory ? `<a class="btn ghost small" href="theory.html?t=${encodeURIComponent(t.id)}">Теория</a>` : ""}
+          <a class="btn small" href="test.html?t=${encodeURIComponent(t.id)}" data-id="${esc(t.id)}" ${r ? "data-again" : ""}>${r ? "Пересдать" : "Начать"} <span class="arr">→</span></a>
+        </div>
+      </section>`;
+    }).join("");
+    const soon = SOON.map(t => `
+      <div class="li soonrow"><span class="dot-c" style="background:var(--${t.color})"></span>
+        <div class="grow">${esc(t.title)}<small>${esc(t.module)}</small></div><span class="pill plain">скоро</span></div>`).join("");
+    app.innerHTML = `
+      <div class="hello"><div><p class="eyebrow">Привет,</p><h1 class="h-name">${esc(who.first)}!</h1></div>
+        <a class="ava" href="#profile" aria-label="Профиль">${esc((who.first || "?")[0].toUpperCase())}</a></div>
+      ${contCard}${cards}
+      <h2 class="sub">Дальше по курсу</h2>
+      <div class="list">${soon}</div>`;
+    // «Пересдать»: сбрасываем прошлое прохождение на этом устройстве
+    app.querySelectorAll("[data-again]").forEach(a => a.addEventListener("click", () => {
+      try { localStorage.removeItem(window.quizStoreKey(a.dataset.id)); } catch (e) {}
+    }));
+  }
+
+  function theoryTab() {
+    const rows = window.TESTS.map(t => t.status === "open" && t.theory ? `
+      <a class="li" href="theory.html?t=${encodeURIComponent(t.id)}"><span class="sw" style="background:var(--${t.color})"></span>
+        <div class="grow">${esc(t.title)}<small>${esc(t.module)} · презентация</small></div><span class="go">›</span></a>` : `
+      <div class="li soonrow"><span class="sw" style="background:var(--${t.color})"></span>
+        <div class="grow">${esc(t.title)}<small>${esc(t.module)} · скоро</small></div></div>`).join("");
+    app.innerHTML = `
+      <h1>Теория</h1>
+      <p class="muted">Презентации с занятий. Слайды листаются свайпом, на телефоне удобнее смотреть горизонтально.</p>
+      <div class="list">${rows}</div>`;
+  }
+
+  function progressTab() {
+    const done = window.TESTS.filter(t => t.status === "open" && best(t));
+    const total = window.TESTS.length;
+    const avg = done.length ? Math.round(done.reduce((s, t) => s + pct(best(t)), 0) / done.length * 100) : null;
+    const rows = window.TESTS.map(t => {
+      const r = t.status === "open" ? best(t) : null;
+      if (r) return `<div class="li"><span class="sw" style="background:var(--${t.color})">✓</span>
+        <div class="grow">${esc(t.title)}<small>лучший результат</small></div><span class="pill ${cls(r)}">${r.score} / ${r.total}</span></div>`;
+      if (t.status === "open") return `<a class="li" href="test.html?t=${encodeURIComponent(t.id)}"><span class="sw" style="background:var(--${t.color})"></span>
+        <div class="grow">${esc(t.title)}<small>ещё не пройден</small></div><span class="go">›</span></a>`;
+      return `<div class="li soonrow"><span class="sw" style="background:var(--cream)"></span>
+        <div class="grow">${esc(t.title)}<small>скоро</small></div></div>`;
+    }).join("");
+    const weak = done.filter(t => pct(best(t)) < 0.8);
+    const tip = weak.length ? `<p class="note">Совет: по теме «${esc(weak[0].title)}» меньше 80% — ${weak[0].theory ? `загляните в <a href="theory.html?t=${encodeURIComponent(weak[0].id)}">теорию</a> и` : ""} пересдайте.</p>` : "";
+    app.innerHTML = `
+      <h1>Прогресс</h1>
+      <section class="card lavender">
+        <p class="eyebrow">Пройдено тем курса</p>
+        <p class="big-num">${done.length} <small>из ${total}</small></p>
+        <div class="bar light"><i style="width:${Math.round(done.length / total * 100)}%"></i></div>
+        <p class="note ink">${avg === null ? "Пройдите первый тест — здесь появится средний результат." : "Средний результат — " + avg + "%"}</p>
+      </section>
+      <div class="list">${rows}</div>
+      ${tip}
+      <p class="note">Прогресс хранится на этом телефоне. Все результаты видит преподаватель.</p>`;
+  }
+
+  function profileTab() {
+    const who = window.Student.get();
+    const installRow = isStandalone() ? "" : `
+      <button class="li" id="p-install"><span class="sw" style="background:var(--cream)">⇪</span>
+        <div class="grow">Установить приложение<small>иконка на экране «Домой»</small></div><span class="go">›</span></button>`;
+    app.innerHTML = `
+      <h1>Профиль</h1>
+      <section class="card pink profile-card">
+        <div class="ava big">${esc((who.first || "?")[0].toUpperCase())}</div>
+        <div class="grow"><h2>${esc(who.first)} ${esc(who.last)}</h2><p class="note ink">курс графического дизайна</p></div>
+      </section>
+      <div class="list">
+        <button class="li" id="p-name"><span class="sw" style="background:var(--cream)">✎</span><div class="grow">Изменить имя</div><span class="go">›</span></button>
+        ${installRow}
+        <button class="li" id="p-help"><span class="sw" style="background:var(--cream)">?</span>
+          <div class="grow">Как это работает<small>показать знакомство ещё раз</small></div><span class="go">›</span></button>
+      </div>
+      <div class="grow-sp"></div>
+      <a class="btn ghost block admin-link" href="admin.html">Вход для преподавателя</a>`;
+    document.getElementById("p-name").onclick = () => register(true);
+    document.getElementById("p-help").onclick = () => { slide = 0; welcome(true); };
+    const pi = document.getElementById("p-install");
+    if (pi) pi.onclick = () => { slide = 2; welcome(true); };
+  }
+
+  const VIEWS = { tests: testsTab, theory: theoryTab, progress: progressTab, profile: profileTab };
+  function show(tab) {
+    if (location.hash !== "#" + tab) { history.replaceState(null, "", "#" + tab); }
+    route();
+  }
+  function route() {
+    const who = window.Student.get();
+    if (!read(ONBOARDED) || !who.first || !who.last) { slide = 0; return welcome(false); }
+    const tab = (location.hash || "#tests").slice(1);
+    const view = VIEWS[tab] ? tab : "tests";
+    document.body.classList.add("has-tabs");
+    renderBar(view);
+    VIEWS[view]();
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener("hashchange", route);
+  route();
 })();
 </script>
 </body>

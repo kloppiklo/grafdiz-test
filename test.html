@@ -100,12 +100,15 @@ function run(META) {
         <div class="shape circle"><span>${esc(topics[2])}</span></div>
       </div>
       <form class="card" id="who" novalidate>
+        <p class="known" id="known" hidden></p>
+        <div class="fields" id="fields">
         <label class="field" for="first">Имя
           <input type="text" id="first" autocomplete="given-name" maxlength="60" required>
         </label>
         <label class="field" for="last">Фамилия
           <input type="text" id="last" autocomplete="family-name" maxlength="60" required>
         </label>
+        </div>
         <p class="note">Отправленный ответ изменить нельзя.</p>
         <p class="error" id="who-err" hidden></p>
         <button class="btn block" type="submit" id="go">Начать <span class="arr">→</span></button>
@@ -114,6 +117,13 @@ function run(META) {
     const f = document.getElementById("first"), l = document.getElementById("last");
     const err = document.getElementById("who-err"), btn = document.getElementById("go");
     f.value = state.first; l.value = state.last;
+    // имя уже знакомо (ввели на главной) — не спрашиваем снова, но даём поправить
+    if (state.first && state.last) {
+      const known = document.getElementById("known"), fields = document.getElementById("fields");
+      known.hidden = false; fields.hidden = true;
+      known.innerHTML = `Вы — <b>${esc(state.first)} ${esc(state.last)}</b> · <button type="button" class="linkbtn inline" id="notme">не вы?</button>`;
+      document.getElementById("notme").onclick = () => { known.hidden = true; fields.hidden = false; f.focus(); };
+    }
     document.getElementById("who").addEventListener("submit", async e => {
       e.preventDefault();
       if (busy) return;
@@ -254,7 +264,14 @@ function run(META) {
       ${META.theory ? `<a class="btn ghost block" href="theory.html?t=${encodeURIComponent(META.id)}">Повторить теорию: презентация</a>` : ""}
       <div class="summary">${list}</div>
     `));
-    try { localStorage.setItem(LAST, JSON.stringify({ score: sc, total, at: new Date().toISOString() })); } catch (e) {}
+    try {
+      const rec = { score: sc, total, at: new Date().toISOString() };
+      localStorage.setItem(LAST, JSON.stringify(rec));
+      // лучший результат — для вкладки «Прогресс»
+      const BEST = "quiz_" + Q.id + "_best";
+      const prev = JSON.parse(localStorage.getItem(BEST) || "null");
+      if (!prev || sc / total > prev.score / prev.total) localStorage.setItem(BEST, JSON.stringify(rec));
+    } catch (e) {}
     document.getElementById("again").addEventListener("click", () => {
       choice = null;
       state = fresh();
