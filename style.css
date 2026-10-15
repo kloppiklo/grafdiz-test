@@ -294,7 +294,7 @@ body.has-tabs { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 .tabbar {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: max(10px, env(safe-area-inset-bottom));
   width: min(440px, calc(100% - 20px)); height: 66px; border-radius: 26px; background: var(--white);
-  display: grid; grid-template-columns: repeat(4, 1fr); align-items: center; z-index: 10;
+  display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; z-index: 10;
   box-shadow: 0 6px 22px rgba(20, 20, 20, .1);
 }
 .tabbar[hidden] { display: none; }
@@ -509,3 +509,34 @@ textarea:focus-visible, a:focus-visible { outline: 3px solid var(--ink); outline
 }
 label.li { cursor: pointer; }
 .list.flat { padding: 0; background: none; }
+
+/* чат группы */
+.eyebrow.ink { color: var(--ink); font-weight: 500; }
+.news { gap: 10px; }
+.news-item { background: rgba(255, 255, 255, .6); border-radius: var(--r-row); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.news-item p, .msg p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.news-item a, .msg a { color: inherit; }
+.chat { display: flex; flex-direction: column; gap: 8px; }
+.chat-day { align-self: center; font-size: 12px; color: var(--ink-2); background: rgba(255, 255, 255, .6); border-radius: 999px; padding: 3px 10px; margin: 6px 0 2px; }
+.msg { align-self: flex-start; max-width: 85%; background: var(--white); border-radius: 20px 20px 20px 6px; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; font-size: 16px; line-height: 1.35; }
+.msg b { font-size: 13px; font-weight: 600; }
+.msg .note { font-size: 12px; }
+.msg.teacher { background: var(--lavender); }
+.msg.me { align-self: flex-end; background: var(--ink); color: var(--white); border-radius: 20px 20px 6px 20px; }
+.msg.me .note, .msg.me .linkbtn { color: rgba(255, 255, 255, .65); }
+.composer {
+  position: sticky; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 5;
+  display: flex; gap: 8px; align-items: flex-end; background: var(--white); border-radius: 28px; padding: 6px;
+  box-shadow: 0 6px 22px rgba(20, 20, 20, .1);
+}
+.composer textarea { min-height: 44px; max-height: 160px; resize: none; background: transparent; border-radius: 22px; padding: 10px 12px; font-size: 16px; line-height: 1.4; }
+.composer textarea:focus-visible { outline: 0; }
+.composer:focus-within { box-shadow: 0 6px 22px rgba(20, 20, 20, .1), inset 0 0 0 2px var(--ink); }
+.send { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--ink); color: var(--white); font-size: 20px; display: grid; place-items: center; }
+.send:disabled { opacity: .35; }
+.chat-admin .msg { max-width: none; align-self: stretch; }
+@media (min-width: 960px) {
+  .composer { bottom: 20px; }
+  .chat, .composer, .news, #chat-err { max-width: 720px; }
+  .msg { max-width: 70%; }
+}

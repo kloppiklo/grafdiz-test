@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f0e2">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="robots" content="noindex">
+<title>Чат группы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap admin" id="app"></main>
+
+<script src="tests.js"></script>
+<script src="config.js"></script>
+<script>
+// Чат группы для преподавателя: объявления и сообщения от имени преподавателя, удаление любых сообщений.
+// Код преподавателя тот же, что в admin.html (хранится до закрытия вкладки).
+(function () {
+  const app = document.getElementById("app");
+  const CODE_KEY = "quiz_admin_code";
+  let code = "";
+  try { code = sessionStorage.getItem(CODE_KEY) || ""; } catch (e) {}
+  let data = null, kind = "news", confirmDel = null, draft = "";
+
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = iso => new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const text = s => esc(s).replace(/https?:\/\/[^\s<]+/g, u => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
+
+  function login(errText) {
+    app.innerHTML = `
+      <div class="topbar"><a class="icon-btn" href="admin.html" aria-label="К результатам тестов">←</a><span class="chip">Для преподавателя</span></div>
+      <h1>Чат <em>группы</em></h1>
+      <form class="card lavender login" id="login" novalidate>
+        <label class="field" for="code">Код преподавателя
+          <input type="password" id="code" autocomplete="current-password" required>
+        </label>
+        <p class="error" ${errText ? "" : "hidden"}>${esc(errText || "")}</p>
+        <button class="btn block" type="submit">Открыть чат <span class="arr">→</span></button>
+      </form>`;
+    document.getElementById("login").addEventListener("submit", e => {
+      e.preventDefault();
+      code = document.getElementById("code").value.trim();
+      checkCode();
+    });
+  }
+
+  // список чата открытый, поэтому код проверяем пустым удалением (несуществующий id)
+  async function checkCode() {
+    try {
+      await window.quizRpc("chat_admin_delete", { p_code: code, p_id: 0 });
+      try { sessionStorage.setItem(CODE_KEY, code); } catch (e) {}
+      fetchData();
+    } catch (e) {
+      try { sessionStorage.removeItem(CODE_KEY); } catch (e2) {}
+      login(/code/i.test(e.message) ? "Код не подошёл. Проверьте его и попробуйте ещё раз." : "Не удалось открыть чат. Проверьте интернет и попробуйте ещё раз.");
+    }
+  }
+
+  async function fetchData() {
+    try { data = await window.quizRpc("chat_list", { p_after: 0 }); render(); } catch (e) { if (!data) login("Не удалось загрузить чат. Проверьте интернет."); }
+  }
+
+  function delBtn(id) {
+    return confirmDel === id
+      ? `<span class="row"><button class="btn small" data-del-yes="${id}">Удалить</button><button class="btn small ghost" data-del-no>Отмена</button></span>`
+      : `<button class="linkbtn inline" data-del="${id}">удалить</button>`;
+  }
+
+  function render() {
+    const ta = document.getElementById("body");
+    if (ta) draft = ta.value;
+    const news = data.news.map(n => `
+      <div class="news-item"><p>${text(n.body)}</p><span class="note">${fmt(n.created_at)} · ${delBtn(n.id)}</span></div>`).join("");
+    const msgs = data.messages.slice().reverse().map(m => `
+      <div class="msg ${m.is_teacher ? "teacher" : ""}">
+        <b>${m.is_teacher ? "Преподаватель" : esc(m.last_name + " " + m.first_name)}</b>
+        <p>${text(m.body)}</p>
+        <span class="note">${fmt(m.created_at)} · ${delBtn(m.id)}</span></div>`).join("");
+    app.innerHTML = `
+      <div class="topbar">
+        <a class="icon-btn" href="admin.html" aria-label="К результатам тестов">←</a><span class="chip">Для преподавателя</span>
+        <span class="grow"></span>
+        <a class="btn small ghost" href="admin.html">Тесты</a>
+        <a class="btn small ghost" href="admin-otr.html">Отработки</a>
+        <button type="button" class="icon-btn" id="refresh" aria-label="Обновить">↻</button>
+      </div>
+      <h1>Чат <em>группы</em></h1>
+      <form class="card lavender" id="post" novalidate>
+        <div class="chips">
+          <button type="button" class="chip ${kind === "news" ? "dark" : ""}" data-kind="news">Объявление</button>
+          <button type="button" class="chip ${kind === "msg" ? "dark" : ""}" data-kind="msg">Сообщение в чат</button>
+        </div>
+        <textarea id="body" maxlength="1000" placeholder="${kind === "news" ? "Например: в четверг пара в 214 аудитории" : "Сообщение от имени преподавателя"}">${esc(draft)}</textarea>
+        <p class="note ink">${kind === "news" ? "Объявление закрепится над чатом у всех студентов (показываются три последних)." : "Сообщение появится в общей ленте с подписью «Преподаватель»."}</p>
+        <p class="error" id="post-err" hidden></p>
+        <button class="btn block" type="submit">Опубликовать <span class="arr">→</span></button>
+      </form>
+      <h2>Объявления</h2>
+      ${news ? `<section class="card yellow news">${news}</section>` : `<p class="muted">Объявлений пока нет.</p>`}
+      <h2>Сообщения <small class="note">новые сверху</small></h2>
+      ${msgs ? `<div class="chat chat-admin">${msgs}</div>` : `<p class="muted">В чате пока никто не писал.</p>`}`;
+
+    app.querySelector("#refresh").onclick = fetchData;
+    app.querySelectorAll("[data-kind]").forEach(b => b.onclick = () => { kind = b.dataset.kind; render(); });
+    app.querySelector("#post").addEventListener("submit", async e => {
+      e.preventDefault();
+      const body = document.getElementById("body").value.trim();
+      if (!body) return;
+      const btn = e.target.querySelector("button[type=submit]");
+      btn.disabled = true;
+      try {
+        await window.quizRpc("chat_admin_send", { p_code: code, p_kind: kind, p_body: body });
+        document.getElementById("body").value = ""; draft = "";
+        fetchData();
+      } catch (ex) {
+        btn.disabled = false;
+        const err = document.getElementById("post-err"); err.textContent = "Не получилось опубликовать. Попробуйте ещё раз."; err.hidden = false;
+      }
+    });
+    app.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { confirmDel = Number(b.dataset.del); render(); });
+    app.querySelectorAll("[data-del-no]").forEach(b => b.onclick = () => { confirmDel = null; render(); });
+    app.querySelectorAll("[data-del-yes]").forEach(b => b.onclick = async () => {
+      try { await window.quizRpc("chat_admin_delete", { p_code: code, p_id: Number(b.dataset.delYes) }); confirmDel = null; fetchData(); }
+      catch (e) { b.textContent = "Не удалось"; }
+    });
+  }
+
+  setInterval(() => {
+    const ta = document.getElementById("body");
+    if (data && code && confirmDel === null && !(ta && ta.value) && document.visibilityState === "visible") fetchData();
+  }, 15000);
+
+  if (code) checkCode(); else login();
+})();
+</script>
+</body>
+</html>
