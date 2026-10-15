@@ -65,6 +65,10 @@
   }
   function best(t) { return read("quiz_" + t.id + "_best") || read("quiz_" + t.id + "_last"); }
   const pct = r => r.score / r.total;
+  // если tests.js ещё старый из кэша — работаем без фото, а не падаем
+  const Avatar = window.Avatar || { get: () => "", set: () => false, clear() {}, fromFile: () => Promise.reject(new Error("no avatar")) };
+  // кружок профиля: фото, если оно есть, иначе первая буква имени
+  const avaInner = who => { const ph = Avatar.get(); return ph ? `<img src="${ph}" alt="">` : esc((who.first || "?")[0].toUpperCase()); };
   const cls = r => pct(r) >= 0.8 ? "good" : pct(r) >= 0.5 ? "mid" : "bad";
 
   // ---------- welcome + знакомство
@@ -206,7 +210,7 @@
     }).join("");
     app.innerHTML = `
       <div class="hello"><div><p class="eyebrow">Привет,</p><h1 class="h-name">${esc(who.first)}!</h1></div>
-        <a class="ava" href="#profile" aria-label="Профиль">${esc((who.first || "?")[0].toUpperCase())}</a></div>
+        <a class="ava" href="#profile" aria-label="Профиль">${avaInner(who)}</a></div>
       <div class="grid-cards">${contCard}${cards}</div>
       <div class="cols">
         ${otr ? `<div class="col"><h2 class="sub">Отработки</h2><p class="muted">Пропустили пару или тема не далась? Разберите её сами и сдайте практику.</p><div class="list">${otr}</div></div>` : ""}
@@ -268,10 +272,14 @@
     app.innerHTML = `
       <h1>Профиль</h1>
       <section class="card pink profile-card">
-        <div class="ava big">${esc((who.first || "?")[0].toUpperCase())}</div>
+        <label class="ava big ava-edit" for="p-file" title="Сменить фото">${avaInner(who)}<span class="ava-badge" aria-hidden="true">＋</span></label>
         <div class="grow"><h2>${esc(who.first)} ${esc(who.last)}</h2><p class="note ink">курс графического дизайна</p></div>
       </section>
+      <input type="file" id="p-file" accept="image/*" hidden>
+      <p class="error" id="p-photo-err" hidden>Не получилось открыть это фото. Попробуйте другое — JPG или PNG.</p>
       <div class="list">
+        <label class="li" for="p-file"><span class="sw" style="background:var(--cream)">◐</span><div class="grow">${Avatar.get() ? "Сменить фото" : "Добавить фото"}<small>видно только на этом устройстве</small></div><span class="go">›</span></label>
+        ${Avatar.get() ? `<button class="li" id="p-photo-del"><span class="sw" style="background:var(--cream)">✕</span><div class="grow">Убрать фото</div><span class="go">›</span></button>` : ""}
         <button class="li" id="p-name"><span class="sw" style="background:var(--cream)">✎</span><div class="grow">Изменить имя</div><span class="go">›</span></button>
         ${installRow}
         <button class="li" id="p-help"><span class="sw" style="background:var(--cream)">?</span>
@@ -280,6 +288,16 @@
       <div class="grow-sp"></div>
       <a class="btn ghost block admin-link" href="admin.html">Вход для преподавателя</a>`;
     document.getElementById("p-name").onclick = () => register(true);
+    document.getElementById("p-file").onchange = async e => {
+      const err = document.getElementById("p-photo-err");
+      try {
+        const data = await Avatar.fromFile(e.target.files[0]);
+        if (!Avatar.set(data)) throw new Error("storage");
+        profileTab();
+      } catch (ex) { err.hidden = false; }
+    };
+    const del = document.getElementById("p-photo-del");
+    if (del) del.onclick = () => { Avatar.clear(); profileTab(); };
     document.getElementById("p-help").onclick = () => { slide = 0; welcome(true); };
     const pi = document.getElementById("p-install");
     if (pi) pi.onclick = () => { slide = 2; welcome(true); };
