@@ -216,3 +216,45 @@ tr.person { cursor: pointer; }
   .opt, .btn { transition: background-color .15s, color .15s, transform .1s; }
   .btn:active:not(:disabled), .opt:active:not(:disabled) { transform: scale(.98); }
 }
+
+/* верхняя строка с круглой кнопкой «назад», как в референсе */
+.topbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.icon-btn {
+  flex: none; width: 40px; height: 40px; border-radius: 50%;
+  background: var(--white); color: var(--ink); text-decoration: none;
+  display: grid; place-items: center; font-size: 18px; border: 0;
+}
+a.btn { text-decoration: none; }
+
+/* главная */
+.test-card h2 { font-size: 30px; }
+.chip.ghost { background: rgba(255, 255, 255, .55); }
+.pill.plain { background: var(--white); color: var(--ink); font-weight: 500; }
+.soon { background: var(--white); border-radius: var(--r-card); padding: 6px 18px; }
+.soon-row { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.soon-row:last-child { border-bottom: 0; }
+.soon-row .grow { flex: 1 1 auto; min-width: 0; }
+.soon-row b { font-weight: 500; }
+.dot-c { flex: none; width: 34px; height: 34px; border-radius: 50%; }
+.soon-row .pill.plain { background: var(--cream); }
+
+/* админка: карточки студентов вместо таблицы */
+.wrap.admin { max-width: 720px; }
+.topbar .grow { flex: 1 1 auto; }
+button.chip { border: 0; cursor: pointer; }
+button.icon-btn { cursor: pointer; }
+.people { display: flex; flex-direction: column; gap: 8px; }
+.person-card { background: var(--white); border-radius: 22px; }
+.person {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  background: none; border: 0; text-align: left; padding: 12px 14px;
+}
+.avatar { flex: none; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: 14px; }
+.person .who { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.person .who b { font-weight: 500; font-size: 16px; }
+.person .chev { flex: none; color: var(--ink-2); font-size: 18px; width: 14px; text-align: center; }
+.person-detail { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 12px; }
+.person-detail .qitem { background: var(--cream); }
+.admin .ring text { font-size: 20px; }
+.test-card .pill { background: var(--white); }
+.pill { white-space: nowrap; flex: none; }

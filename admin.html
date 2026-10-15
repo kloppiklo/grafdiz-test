@@ -4,35 +4,58 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>Результаты · Визуальное мышление</title>
+<title>Результаты тестов</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="wrap wide" id="app"></main>
+<main class="wrap admin" id="app"></main>
 
-<script src="questions.js"></script>
+<script src="tests.js"></script>
 <script src="config.js"></script>
 <script>
 (function () {
-  const Q = window.QUIZ;
   const app = document.getElementById("app");
   const CODE_KEY = "quiz_admin_code";
+  const OPEN_TESTS = window.TESTS.filter(t => t.status === "open");
+  const AVATAR = ["yellow", "pink", "lavender", "mint", "peach", "blue"];
+
   let code = "";
   try { code = sessionStorage.getItem(CODE_KEY) || ""; } catch (e) {}
-  let data = null, open = null, sortBy = "date", confirmDel = null;
+  let testId = new URLSearchParams(location.search).get("t");
+  if (!OPEN_TESTS.some(t => t.id === testId)) testId = OPEN_TESTS[0].id;
+  let Q = null, data = null, open = null, sortBy = "date", confirmDel = null;
+  const questionCache = {};
 
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmt = iso => new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   const pillCls = p => p >= 0.8 ? "good" : p >= 0.5 ? "mid" : "bad";
+  const meta = () => OPEN_TESTS.find(t => t.id === testId);
+  const personKey = s => (s.last_name + " " + s.first_name).toLowerCase().replace(/\s+/g, " ").trim();
+
+  function loadQuestions(id) {
+    if (questionCache[id]) return Promise.resolve(questionCache[id]);
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "questions/" + id + ".js";
+      s.onload = () => { questionCache[id] = window.QUIZ; resolve(window.QUIZ); };
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  function testSwitch() {
+    return `<div class="chips" role="tablist">${OPEN_TESTS.map(t =>
+      `<button type="button" class="chip ${t.id === testId ? "dark" : ""}" role="tab" aria-selected="${t.id === testId}" data-test="${t.id}">${esc(t.title)}</button>`).join("")}</div>`;
+  }
 
   function login(errText) {
     app.innerHTML = `
-      <div class="chips"><span class="chip">${esc(Q.module)}</span></div>
-      <h1>Результаты <em>теста</em></h1>
-      <form class="card login" id="login" novalidate>
+      <div class="topbar"><span class="chip">Для преподавателя</span></div>
+      <h1>Результаты <em>тестов</em></h1>
+      <form class="card lavender login" id="login" novalidate>
         <label class="field" for="code">Код преподавателя
           <input type="password" id="code" autocomplete="current-password" required>
         </label>
@@ -48,58 +71,81 @@
 
   async function fetchData(quiet) {
     try {
-      data = await window.quizRpc("quiz_admin_results", { p_quiz: Q.id, p_code: code });
+      const [questions, res] = await Promise.all([
+        loadQuestions(testId),
+        window.quizRpc("quiz_admin_results", { p_quiz: testId, p_code: code })
+      ]);
+      Q = questions; data = res;
       try { sessionStorage.setItem(CODE_KEY, code); } catch (e) {}
       render();
     } catch (e) {
       if (quiet === true) return;
       try { sessionStorage.removeItem(CODE_KEY); } catch (e2) {}
-      login(e.status === 400 || /code/i.test(e.message) ? "Код не подошёл. Проверьте его и попробуйте ещё раз." : "Не удалось загрузить результаты. Проверьте интернет и попробуйте ещё раз.");
+      login(e && (e.status === 400 || /code/i.test(e.message)) ? "Код не подошёл. Проверьте его и попробуйте ещё раз." : "Не удалось загрузить результаты. Проверьте интернет и попробуйте ещё раз.");
     }
   }
 
   function render() {
-    const subs = data.attempts.slice();
     const total = data.total || Q.questions.length;
-    if (sortBy === "name") subs.sort((a, b) => (a.last_name + a.first_name).localeCompare(b.last_name + b.first_name, "ru"));
-    else if (sortBy === "score") subs.sort((a, b) => b.score - a.score);
-    else subs.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const all = data.attempts.slice();
 
-    const finished = subs.filter(x => x.answered >= total);
-    const inProgress = subs.length - finished.length;
-    const avg = finished.length ? finished.reduce((s, x) => s + x.score, 0) / finished.length : 0;
+    // номер попытки у каждого студента (по времени начала)
+    const byPerson = {};
+    all.slice().sort((a, b) => a.created_at.localeCompare(b.created_at)).forEach(s => {
+      const k = personKey(s);
+      (byPerson[k] = byPerson[k] || []).push(s);
+      s.try = byPerson[k].length;
+    });
+    all.forEach(s => { s.tries = byPerson[personKey(s)].length; });
+
+    // сводка — по последней завершённой попытке каждого студента
+    const latestDone = Object.values(byPerson).map(list => list.filter(s => s.answered >= total).pop()).filter(Boolean);
+    const students = Object.keys(byPerson).length;
+    const inProgress = all.filter(s => s.answered < total).length;
+    const avg = latestDone.length ? latestDone.reduce((x, s) => x + s.score, 0) / latestDone.length : 0;
+    const share = students ? latestDone.length / students : 0;
+    const C = 2 * Math.PI * 46;
+
+    const subs = all.slice();
+    if (sortBy === "name") subs.sort((a, b) => personKey(a).localeCompare(personKey(b), "ru") || a.try - b.try);
+    else if (sortBy === "score") subs.sort((a, b) => b.score - a.score);
+    else subs.sort((a, b) => (b.last_at || b.created_at).localeCompare(a.last_at || a.created_at));
 
     const rows = subs.map(s => {
       const isDone = s.answered >= total;
-      const p = s.score / total;
       const isOpen = open === s.id;
+      const initials = (s.first_name[0] || "") + (s.last_name[0] || "");
+      const color = AVATAR[[...personKey(s)].reduce((h, c) => h + c.charCodeAt(0), 0) % AVATAR.length];
       let detail = "";
       if (isOpen) {
         const items = Q.questions.map(q => {
           const a = s.answers[q.id];
-          if (a === undefined) return `<div class="qitem"><span class="mk note">·</span><span><b>${q.id}.</b> ${esc(q.text)}<br><span class="note">Ещё не ответил(а)</span></span></div>`;
+          if (a === undefined) return `<div class="qitem"><span class="mk">·</span><span><b>${q.id}.</b> ${esc(q.text)}<br><span class="note">Ещё не ответил(а)</span></span></div>`;
           const ok = a === data.key[q.id];
           return `<div class="qitem ${ok ? "ok" : "no"}"><span class="mk">${ok ? "✓" : "✗"}</span>
-            <span><b>${q.id}.</b> ${esc(q.text)}<br><span class="note">${ok ? "" : "Ответ: " + esc(q.options[a] || a) + "<br>Верно: " + esc(q.options[data.key[q.id]])}</span></span></div>`;
+            <span><b>${q.id}.</b> ${esc(q.text)}${ok ? "" : `<br><span class="note">Ответ: ${esc(q.options[a] || a)}<br>Верно: ${esc(q.options[data.key[q.id]])}</span>`}</span></div>`;
         }).join("");
         const del = confirmDel === s.id
-          ? `<span class="note">Удалить результат без возможности восстановить?</span>
+          ? `<span class="note grow">Удалить эту попытку без возможности восстановить?</span>
              <button class="btn small" data-del-yes="${s.id}">Удалить</button>
              <button class="btn small ghost" data-del-no>Отмена</button>`
-          : `<button class="btn small ghost" data-del="${s.id}">Удалить результат</button>`;
-        detail = `<tr class="detail"><td colspan="5"><div class="qlist">${items}</div><div class="row" style="margin-top:12px">${del}</div></td></tr>`;
+          : `<button class="btn small ghost" data-del="${s.id}">Удалить попытку</button>`;
+        detail = `<div class="person-detail"><div class="qlist">${items}</div><div class="row">${del}</div></div>`;
       }
-      return `<tr class="person" data-id="${s.id}">
-        <td>${esc(s.last_name)} ${esc(s.first_name)}</td>
-        <td class="num"><span class="pill ${isDone ? pillCls(p) : "wait"}">${s.score} / ${total}</span></td>
-        <td class="note">${isDone ? "готово" : "отвечает: " + s.answered + " из " + total}</td>
-        <td class="num hide-sm">${fmt(s.last_at || s.created_at)}</td>
-        <td class="note hide-sm">${isOpen ? "Скрыть" : "Ответы"}</td>
-      </tr>${detail}`;
+      return `<div class="person-card ${isOpen ? "open" : ""}">
+        <button type="button" class="person" data-id="${s.id}" aria-expanded="${isOpen}">
+          <span class="avatar" style="background: var(--${color})">${esc(initials.toUpperCase())}</span>
+          <span class="who"><b>${esc(s.last_name)} ${esc(s.first_name)}</b>
+            <span class="note">${s.tries > 1 ? "попытка " + s.try + " · " : ""}${isDone ? "готово" : "отвечает: " + s.answered + " из " + total} · ${fmt(s.last_at || s.created_at)}</span></span>
+          <span class="pill ${isDone ? pillCls(s.score / total) : "wait"}">${s.score} / ${total}</span>
+          <span class="chev" aria-hidden="true">${isOpen ? "⌃" : "›"}</span>
+        </button>
+        ${detail}
+      </div>`;
     }).join("");
 
     const qstats = Q.questions.map(q => {
-      const answered = subs.filter(s => s.answers[q.id] !== undefined);
+      const answered = latestDone.filter(s => s.answers[q.id] !== undefined);
       const ok = answered.filter(s => s.answers[q.id] === data.key[q.id]).length;
       const p = answered.length ? ok / answered.length : 0;
       return `<div class="qstat"><div class="num">${q.id}</div><div>${esc(q.text)}</div>
@@ -107,41 +153,67 @@
     }).join("");
 
     app.innerHTML = `
-      <div class="row">
-        <div class="grow"><div class="chips" style="margin-bottom:12px"><span class="chip">${esc(Q.module)}</span></div><h1>Результаты <em>теста</em></h1></div>
-        <button class="btn ghost small" id="refresh">Обновить</button>
+      <div class="topbar">
+        <span class="chip">Для преподавателя</span>
+        <span class="grow"></span>
+        <button type="button" class="icon-btn" id="refresh" aria-label="Обновить">↻</button>
       </div>
-      <p class="note">Обновляется само каждые 15 секунд.</p>
+      <h1>Результаты <em>тестов</em></h1>
+      ${testSwitch()}
+
+      <section class="card lavender">
+        <div class="result">
+          <div>
+            <p class="eyebrow">${esc(meta().module)}</p>
+            <p class="score">${latestDone.length ? avg.toFixed(1) : "—"}<small> / ${total}</small></p>
+            <p>средний балл</p>
+          </div>
+          <svg class="ring" viewBox="0 0 116 116" role="img" aria-label="Завершили ${Math.round(share * 100)}% студентов">
+            <circle class="track" cx="58" cy="58" r="46"></circle>
+            <circle class="val" cx="58" cy="58" r="46" stroke-dasharray="${C * share} ${C}"></circle>
+            <text x="58" y="66" text-anchor="middle">${latestDone.length}/${students}</text>
+          </svg>
+        </div>
+        <p class="note">Считается по последней завершённой попытке каждого студента. Обновляется само каждые 15 секунд.</p>
+      </section>
+
       <div class="stats">
-        <div class="stat"><span>Завершили</span><b>${finished.length}</b></div>
-        <div class="stat"><span>В процессе</span><b>${inProgress}</b></div>
-        <div class="stat"><span>Средний балл</span><b>${finished.length ? avg.toFixed(1) : "—"}<span class="note"> / ${total}</span></b></div>
+        <div class="stat"><span>Студентов</span><b>${students}</b></div>
+        <div class="stat"><span>Отвечают сейчас</span><b>${inProgress}</b></div>
+        <div class="stat"><span>Попыток всего</span><b>${all.length}</b></div>
       </div>
+
       <div class="row">
         <h2 class="grow">Студенты</h2>
-        <span class="note">Сортировка:</span>
-        <button class="btn small ${sortBy === "date" ? "" : "ghost"}" data-sort="date">по времени</button>
-        <button class="btn small ${sortBy === "name" ? "" : "ghost"}" data-sort="name">по фамилии</button>
-        <button class="btn small ${sortBy === "score" ? "" : "ghost"}" data-sort="score">по баллу</button>
+        <div class="chips">
+          <button type="button" class="chip ${sortBy === "date" ? "dark" : ""}" data-sort="date">по времени</button>
+          <button type="button" class="chip ${sortBy === "name" ? "dark" : ""}" data-sort="name">по фамилии</button>
+          <button type="button" class="chip ${sortBy === "score" ? "dark" : ""}" data-sort="score">по баллу</button>
+        </div>
       </div>
-      ${subs.length ? `<div class="table-scroll"><table>
-        <thead><tr><th>Студент</th><th>Верно</th><th>Статус</th><th class="hide-sm">Последний ответ</th><th class="hide-sm"></th></tr></thead>
-        <tbody>${rows}</tbody></table></div>`
-      : `<div class="card yellow"><h2>Пока никто не начал тест</h2><p class="muted">Отправьте студентам ссылку на тест. Каждый ответ появляется здесь сразу, как только студент его отправил.</p></div>`}
+      ${subs.length ? `<div class="people">${rows}</div>`
+      : `<div class="card yellow"><h2>Пока никто не начал тест</h2><p>Отправьте студентам ссылку на главную страницу с тестами. Каждый ответ появляется здесь сразу, как только студент его отправил.</p></div>`}
+
       <h2>Какие вопросы даются сложнее</h2>
-      <p class="muted">Доля верных ответов среди тех, кто уже ответил на вопрос.</p>
+      <p class="muted">Доля верных ответов по последней завершённой попытке каждого студента.</p>
       <div class="qstats">${qstats}</div>`;
 
     app.querySelector("#refresh").addEventListener("click", () => fetchData());
+    app.querySelectorAll("[data-test]").forEach(b => b.addEventListener("click", () => {
+      if (b.dataset.test === testId) return;
+      testId = b.dataset.test; open = null; confirmDel = null;
+      history.replaceState(null, "", "?t=" + encodeURIComponent(testId));
+      fetchData();
+    }));
     app.querySelectorAll("[data-sort]").forEach(b => b.addEventListener("click", () => { sortBy = b.dataset.sort; render(); }));
-    app.querySelectorAll("tr.person").forEach(tr => tr.addEventListener("click", () => {
-      const id = Number(tr.dataset.id); open = open === id ? null : id; confirmDel = null; render();
+    app.querySelectorAll("button.person").forEach(b => b.addEventListener("click", () => {
+      const id = Number(b.dataset.id); open = open === id ? null : id; confirmDel = null; render();
     }));
     app.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => { confirmDel = Number(b.dataset.del); render(); }));
     app.querySelectorAll("[data-del-no]").forEach(b => b.addEventListener("click", () => { confirmDel = null; render(); }));
     app.querySelectorAll("[data-del-yes]").forEach(b => b.addEventListener("click", async () => {
       try {
-        await window.quizRpc("quiz_admin_delete", { p_quiz: Q.id, p_code: code, p_id: Number(b.dataset.delYes) });
+        await window.quizRpc("quiz_admin_delete", { p_quiz: testId, p_code: code, p_id: Number(b.dataset.delYes) });
         open = null; confirmDel = null; fetchData();
       } catch (e) { b.textContent = "Не удалось удалить"; }
     }));
