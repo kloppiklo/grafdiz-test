@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Результаты · Визуальное мышление</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap wide" id="app"></main>
+
+<script src="questions.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  const Q = window.QUIZ;
+  const app = document.getElementById("app");
+  const CODE_KEY = "quiz_admin_code";
+  let code = "";
+  try { code = sessionStorage.getItem(CODE_KEY) || ""; } catch (e) {}
+  let data = null, open = null, sortBy = "date", confirmDel = null;
+
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = iso => new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const pillCls = p => p >= 0.8 ? "good" : p >= 0.5 ? "mid" : "bad";
+
+  function login(errText) {
+    app.innerHTML = `
+      <div><p class="eyebrow">${esc(Q.module)}</p><h1>Результаты теста</h1></div>
+      <form class="sheet" id="login" style="max-width:420px" novalidate>
+        <label class="field" for="code">Код преподавателя
+          <input type="password" id="code" autocomplete="current-password" required>
+        </label>
+        <p class="error" ${errText ? "" : "hidden"}>${esc(errText || "")}</p>
+        <button class="btn" type="submit">Открыть результаты</button>
+      </form>`;
+    document.getElementById("login").addEventListener("submit", e => {
+      e.preventDefault();
+      code = document.getElementById("code").value.trim();
+      fetchData();
+    });
+  }
+
+  async function fetchData() {
+    try {
+      data = await window.quizRpc("quiz_admin_results", { p_quiz: Q.id, p_code: code });
+      try { sessionStorage.setItem(CODE_KEY, code); } catch (e) {}
+      render();
+    } catch (e) {
+      try { sessionStorage.removeItem(CODE_KEY); } catch (e2) {}
+      login(e.status === 400 || /code/i.test(e.message) ? "Код не подошёл. Проверьте его и попробуйте ещё раз." : "Не удалось загрузить результаты. Проверьте интернет и попробуйте ещё раз.");
+    }
+  }
+
+  function render() {
+    const subs = data.submissions.slice();
+    const total = Q.questions.length;
+    if (sortBy === "name") subs.sort((a, b) => (a.last_name + a.first_name).localeCompare(b.last_name + b.first_name, "ru"));
+    else if (sortBy === "score") subs.sort((a, b) => b.score - a.score);
+    else subs.sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+    const n = subs.length;
+    const avg = n ? subs.reduce((s, x) => s + x.score, 0) / n : 0;
+    const passed = subs.filter(x => x.score / x.total >= 0.7).length;
+
+    const rows = subs.map(s => {
+      const p = s.score / s.total;
+      const isOpen = open === s.id;
+      let detail = "";
+      if (isOpen) {
+        const items = Q.questions.map(q => {
+          const a = s.answers[q.id], ok = a === data.key[q.id];
+          return `<div class="qitem ${ok ? "ok" : "no"}"><span class="mk">${ok ? "✓" : "✗"}</span>
+            <span><b>${q.id}.</b> ${esc(q.text)}<br><span class="note">${ok ? "" : "Ответ: " + esc(q.options[a] || "нет ответа") + "<br>Верно: " + esc(q.options[data.key[q.id]])}</span></span></div>`;
+        }).join("");
+        const del = confirmDel === s.id
+          ? `<span class="note">Удалить результат без возможности восстановить?</span>
+             <button class="btn small" data-del-yes="${s.id}">Удалить</button>
+             <button class="btn small ghost" data-del-no>Отмена</button>`
+          : `<button class="btn small ghost" data-del="${s.id}">Удалить результат</button>`;
+        detail = `<tr class="detail"><td colspan="5"><div class="qlist">${items}</div><div class="row" style="margin-top:12px">${del}</div></td></tr>`;
+      }
+      return `<tr class="person" data-id="${s.id}">
+        <td>${esc(s.last_name)} ${esc(s.first_name)}</td>
+        <td class="num"><span class="pill ${pillCls(p)}">${s.score} / ${s.total}</span></td>
+        <td class="num">${Math.round(p * 100)}%</td>
+        <td class="num hide-sm">${fmt(s.created_at)}</td>
+        <td class="note hide-sm">${isOpen ? "Скрыть" : "Ответы"}</td>
+      </tr>${detail}`;
+    }).join("");
+
+    const qstats = Q.questions.map(q => {
+      const ok = subs.filter(s => s.answers[q.id] === data.key[q.id]).length;
+      const p = n ? ok / n : 0;
+      return `<div class="qstat"><div class="num">${q.id}</div><div>${esc(q.text)}</div>
+        <div class="bar"><i style="width:${Math.round(p * 100)}%"></i></div><div class="num">${n ? Math.round(p * 100) + "%" : "—"}</div></div>`;
+    }).join("");
+
+    app.innerHTML = `
+      <div class="row">
+        <div class="grow"><p class="eyebrow">${esc(Q.module)}</p><h1>Результаты теста</h1></div>
+        <button class="btn ghost small" id="refresh">Обновить</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="note">Прошли</span><b>${n}</b></div>
+        <div class="stat"><span class="note">Средний балл</span><b>${n ? avg.toFixed(1) : "—"}<span class="note"> / ${total}</span></b></div>
+        <div class="stat"><span class="note">70% и выше</span><b>${n ? passed : "—"}</b></div>
+      </div>
+      <div class="row">
+        <h2 class="grow">Студенты</h2>
+        <span class="note">Сортировка:</span>
+        <button class="btn small ${sortBy === "date" ? "" : "ghost"}" data-sort="date">по времени</button>
+        <button class="btn small ${sortBy === "name" ? "" : "ghost"}" data-sort="name">по фамилии</button>
+        <button class="btn small ${sortBy === "score" ? "" : "ghost"}" data-sort="score">по баллу</button>
+      </div>
+      ${n ? `<div class="table-scroll"><table>
+        <thead><tr><th>Студент</th><th>Балл</th><th>%</th><th class="hide-sm">Отправлено</th><th class="hide-sm"></th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`
+      : `<div class="sheet"><p>Пока никто не прошёл тест.</p><p class="muted">Отправьте студентам ссылку на тест. Результаты появятся здесь, когда кто-нибудь отправит ответы; нажмите «Обновить».</p></div>`}
+      <h2>Какие вопросы даются сложнее</h2>
+      <p class="muted">Доля верных ответов по каждому вопросу.</p>
+      <div>${qstats}</div>`;
+
+    app.querySelector("#refresh").addEventListener("click", fetchData);
+    app.querySelectorAll("[data-sort]").forEach(b => b.addEventListener("click", () => { sortBy = b.dataset.sort; render(); }));
+    app.querySelectorAll("tr.person").forEach(tr => tr.addEventListener("click", () => {
+      const id = Number(tr.dataset.id); open = open === id ? null : id; confirmDel = null; render();
+    }));
+    app.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => { confirmDel = Number(b.dataset.del); render(); }));
+    app.querySelectorAll("[data-del-no]").forEach(b => b.addEventListener("click", () => { confirmDel = null; render(); }));
+    app.querySelectorAll("[data-del-yes]").forEach(b => b.addEventListener("click", async () => {
+      try {
+        await window.quizRpc("quiz_admin_delete", { p_quiz: Q.id, p_code: code, p_id: Number(b.dataset.delYes) });
+        open = null; confirmDel = null; fetchData();
+      } catch (e) { b.textContent = "Не удалось удалить"; }
+    }));
+  }
+
+  if (code) fetchData(); else login();
+})();
+</script>
+</body>
+</html>

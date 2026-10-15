@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Тест · Визуальное мышление</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap" id="app" aria-live="polite"></main>
+
+<script src="questions.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  const Q = window.QUIZ;
+  const STORE = "quiz_" + Q.id;
+  const LETTERS = ["А", "Б", "В", "Г", "Д"];
+  const app = document.getElementById("app");
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(STORE)) || null; } catch (e) { return null; }
+  }
+  function save() {
+    try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {}
+  }
+  function shuffled(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  function fresh() {
+    const order = {};
+    Q.questions.forEach(q => { order[q.id] = shuffled(Object.keys(q.options)); });
+    return { step: "start", first: "", last: "", idx: 0, answers: {}, order, result: null };
+  }
+
+  let state = load() || fresh();
+  if (state.step === "sending") state.step = "review";
+
+  function el(html) {
+    const t = document.createElement("template");
+    t.innerHTML = html.trim();
+    return t.content;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function go(step) { state.step = step; save(); render(); window.scrollTo(0, 0); }
+
+  function render() {
+    app.textContent = "";
+    ({ start, question, review, done })[state.step === "sending" ? "review" : state.step]();
+  }
+
+  function start() {
+    app.append(el(`
+      <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <div>
+        <p class="eyebrow">${esc(Q.module)}</p>
+        <h1>${esc(Q.title)}</h1>
+      </div>
+      <p class="muted">${Q.questions.length} вопросов по теории: композиция, баланс, визуальный центр, контраст и иерархия. В каждом вопросе один правильный ответ. Обычно это занимает 10–15 минут.</p>
+      <form class="sheet" id="who" novalidate>
+        <label class="field" for="first">Имя
+          <input type="text" id="first" autocomplete="given-name" maxlength="60" required>
+        </label>
+        <label class="field" for="last">Фамилия
+          <input type="text" id="last" autocomplete="family-name" maxlength="60" required>
+        </label>
+        <p class="error" id="who-err" hidden>Впишите имя и фамилию, чтобы преподаватель увидел ваш результат.</p>
+        <button class="btn" type="submit">Начать тест</button>
+      </form>
+    `));
+    const f = document.getElementById("first"), l = document.getElementById("last");
+    f.value = state.first; l.value = state.last;
+    document.getElementById("who").addEventListener("submit", e => {
+      e.preventDefault();
+      const first = f.value.trim(), last = l.value.trim();
+      if (!first || !last) { document.getElementById("who-err").hidden = false; return; }
+      state.first = first; state.last = last; state.idx = 0;
+      go("question");
+    });
+  }
+
+  function question() {
+    const q = Q.questions[state.idx];
+    const total = Q.questions.length;
+    const chosen = state.answers[q.id];
+    const bars = Q.questions.map((qq, i) =>
+      `<span class="${i === state.idx ? "now" : (state.answers[qq.id] ? "done" : "")}"></span>`).join("");
+    const opts = state.order[q.id].map((k, i) => `
+      <button type="button" class="opt" role="radio" aria-checked="${chosen === k}" data-k="${k}">
+        <span class="key">${LETTERS[i]}</span><span>${esc(q.options[k])}</span>
+      </button>`).join("");
+    app.append(el(`
+      <div class="row">
+        <p class="eyebrow grow">Вопрос ${state.idx + 1} из ${total} · ${esc(q.topic)}</p>
+      </div>
+      <div class="progress" style="grid-template-columns: repeat(${total}, 1fr)" aria-hidden="true">${bars}</div>
+      <h2>${esc(q.text)}</h2>
+      <div class="options" role="radiogroup" aria-label="Варианты ответа">${opts}</div>
+      <div class="row">
+        <button type="button" class="btn ghost" id="back">${state.idx === 0 ? "К началу" : "Назад"}</button>
+        <button type="button" class="btn grow" id="next" ${chosen ? "" : "disabled"}>${state.idx === total - 1 ? "Проверить ответы" : "Дальше"}</button>
+      </div>
+    `));
+    app.querySelectorAll(".opt").forEach(b => b.addEventListener("click", () => {
+      state.answers[q.id] = b.dataset.k; save();
+      app.querySelectorAll(".opt").forEach(o => o.setAttribute("aria-checked", String(o === b)));
+      document.getElementById("next").disabled = false;
+    }));
+    document.getElementById("back").addEventListener("click", () => {
+      if (state.idx === 0) go("start"); else { state.idx--; go("question"); }
+    });
+    document.getElementById("next").addEventListener("click", () => {
+      if (state.idx === total - 1) go("review"); else { state.idx++; go("question"); }
+    });
+  }
+
+  function review() {
+    const missing = Q.questions.filter(q => !state.answers[q.id]);
+    const sending = state.step === "sending";
+    const list = Q.questions.map((q, i) => {
+      const k = state.answers[q.id];
+      const pos = k ? state.order[q.id].indexOf(k) : -1;
+      return `<button type="button" class="opt" data-i="${i}">
+        <span class="key">${i + 1}</span>
+        <span>${esc(q.text)}<br><span class="note">${k ? LETTERS[pos] + " · " + esc(q.options[k]) : "нет ответа"}</span></span>
+      </button>`;
+    }).join("");
+    app.append(el(`
+      <div>
+        <p class="eyebrow">${esc(state.first)} ${esc(state.last)}</p>
+        <h1>Проверьте ответы</h1>
+      </div>
+      <p class="muted">Нажмите на вопрос, чтобы изменить ответ. После отправки изменить ответы будет нельзя.</p>
+      <div class="options">${list}</div>
+      <p class="error" id="send-err" ${missing.length ? "" : "hidden"}>${missing.length ? "Остались вопросы без ответа: " + missing.length + "." : ""}</p>
+      <button type="button" class="btn" id="send" ${missing.length || sending ? "disabled" : ""}>${sending ? "Отправляем…" : "Отправить ответы"}</button>
+    `));
+    app.querySelectorAll(".opt").forEach(b => b.addEventListener("click", () => {
+      state.idx = Number(b.dataset.i); go("question");
+    }));
+    document.getElementById("send").addEventListener("click", submit);
+  }
+
+  async function submit() {
+    state.step = "sending"; render();
+    try {
+      const r = await window.quizRpc("quiz_submit", {
+        p_quiz: Q.id, p_first_name: state.first, p_last_name: state.last, p_answers: state.answers
+      });
+      state.result = { score: r.score, total: r.total, at: new Date().toISOString() };
+      go("done");
+    } catch (e) {
+      state.step = "review"; render();
+      const err = document.getElementById("send-err");
+      err.hidden = false;
+      err.textContent = "Ответы не отправились. Проверьте интернет и нажмите «Отправить ответы» ещё раз.";
+    }
+  }
+
+  function done() {
+    const r = state.result;
+    app.append(el(`
+      <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <div>
+        <p class="eyebrow">${esc(state.first)} ${esc(state.last)}</p>
+        <h1>Ответы отправлены</h1>
+      </div>
+      <div class="sheet">
+        <p class="eyebrow">Ваш результат</p>
+        <p class="score">${r.score}<small> / ${r.total}</small></p>
+        <p class="muted">Преподаватель уже видит результат. Разбор ошибок будет на занятии.</p>
+      </div>
+    `));
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
