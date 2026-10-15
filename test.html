@@ -251,7 +251,7 @@ function run(META) {
         <a class="btn grow" href="./">На главную <span class="arr">→</span></a>
         <button type="button" class="btn ghost grow" id="again">Пройти ещё раз</button>
       </div>
-      ${META.theory ? `<a class="btn ghost block" href="${esc(META.theory)}" target="_blank" rel="noopener">Повторить теорию: презентация</a>` : ""}
+      ${META.theory ? `<a class="btn ghost block" href="theory.html?t=${encodeURIComponent(META.id)}">Повторить теорию: презентация</a>` : ""}
       <div class="summary">${list}</div>
     `));
     try { localStorage.setItem(LAST, JSON.stringify({ score: sc, total, at: new Date().toISOString() })); } catch (e) {}
