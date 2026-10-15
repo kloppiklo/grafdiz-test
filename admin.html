@@ -45,37 +45,41 @@
     });
   }
 
-  async function fetchData() {
+  async function fetchData(quiet) {
     try {
       data = await window.quizRpc("quiz_admin_results", { p_quiz: Q.id, p_code: code });
       try { sessionStorage.setItem(CODE_KEY, code); } catch (e) {}
       render();
     } catch (e) {
+      if (quiet === true) return;
       try { sessionStorage.removeItem(CODE_KEY); } catch (e2) {}
       login(e.status === 400 || /code/i.test(e.message) ? "Код не подошёл. Проверьте его и попробуйте ещё раз." : "Не удалось загрузить результаты. Проверьте интернет и попробуйте ещё раз.");
     }
   }
 
   function render() {
-    const subs = data.submissions.slice();
-    const total = Q.questions.length;
+    const subs = data.attempts.slice();
+    const total = data.total || Q.questions.length;
     if (sortBy === "name") subs.sort((a, b) => (a.last_name + a.first_name).localeCompare(b.last_name + b.first_name, "ru"));
     else if (sortBy === "score") subs.sort((a, b) => b.score - a.score);
     else subs.sort((a, b) => b.created_at.localeCompare(a.created_at));
 
-    const n = subs.length;
-    const avg = n ? subs.reduce((s, x) => s + x.score, 0) / n : 0;
-    const passed = subs.filter(x => x.score / x.total >= 0.7).length;
+    const finished = subs.filter(x => x.answered >= total);
+    const inProgress = subs.length - finished.length;
+    const avg = finished.length ? finished.reduce((s, x) => s + x.score, 0) / finished.length : 0;
 
     const rows = subs.map(s => {
-      const p = s.score / s.total;
+      const isDone = s.answered >= total;
+      const p = s.score / total;
       const isOpen = open === s.id;
       let detail = "";
       if (isOpen) {
         const items = Q.questions.map(q => {
-          const a = s.answers[q.id], ok = a === data.key[q.id];
+          const a = s.answers[q.id];
+          if (a === undefined) return `<div class="qitem"><span class="mk note">·</span><span><b>${q.id}.</b> ${esc(q.text)}<br><span class="note">Ещё не ответил(а)</span></span></div>`;
+          const ok = a === data.key[q.id];
           return `<div class="qitem ${ok ? "ok" : "no"}"><span class="mk">${ok ? "✓" : "✗"}</span>
-            <span><b>${q.id}.</b> ${esc(q.text)}<br><span class="note">${ok ? "" : "Ответ: " + esc(q.options[a] || "нет ответа") + "<br>Верно: " + esc(q.options[data.key[q.id]])}</span></span></div>`;
+            <span><b>${q.id}.</b> ${esc(q.text)}<br><span class="note">${ok ? "" : "Ответ: " + esc(q.options[a] || a) + "<br>Верно: " + esc(q.options[data.key[q.id]])}</span></span></div>`;
         }).join("");
         const del = confirmDel === s.id
           ? `<span class="note">Удалить результат без возможности восстановить?</span>
@@ -86,18 +90,19 @@
       }
       return `<tr class="person" data-id="${s.id}">
         <td>${esc(s.last_name)} ${esc(s.first_name)}</td>
-        <td class="num"><span class="pill ${pillCls(p)}">${s.score} / ${s.total}</span></td>
-        <td class="num">${Math.round(p * 100)}%</td>
-        <td class="num hide-sm">${fmt(s.created_at)}</td>
+        <td class="num"><span class="pill ${isDone ? pillCls(p) : "mid"}">${s.score} / ${total}</span></td>
+        <td class="note">${isDone ? "готово" : "отвечает: " + s.answered + " из " + total}</td>
+        <td class="num hide-sm">${fmt(s.last_at || s.created_at)}</td>
         <td class="note hide-sm">${isOpen ? "Скрыть" : "Ответы"}</td>
       </tr>${detail}`;
     }).join("");
 
     const qstats = Q.questions.map(q => {
-      const ok = subs.filter(s => s.answers[q.id] === data.key[q.id]).length;
-      const p = n ? ok / n : 0;
+      const answered = subs.filter(s => s.answers[q.id] !== undefined);
+      const ok = answered.filter(s => s.answers[q.id] === data.key[q.id]).length;
+      const p = answered.length ? ok / answered.length : 0;
       return `<div class="qstat"><div class="num">${q.id}</div><div>${esc(q.text)}</div>
-        <div class="bar"><i style="width:${Math.round(p * 100)}%"></i></div><div class="num">${n ? Math.round(p * 100) + "%" : "—"}</div></div>`;
+        <div class="bar"><i style="width:${Math.round(p * 100)}%"></i></div><div class="num">${answered.length ? Math.round(p * 100) + "%" : "—"}</div></div>`;
     }).join("");
 
     app.innerHTML = `
@@ -105,10 +110,11 @@
         <div class="grow"><p class="eyebrow">${esc(Q.module)}</p><h1>Результаты теста</h1></div>
         <button class="btn ghost small" id="refresh">Обновить</button>
       </div>
+      <p class="note">Обновляется само каждые 15 секунд.</p>
       <div class="stats">
-        <div class="stat"><span class="note">Прошли</span><b>${n}</b></div>
-        <div class="stat"><span class="note">Средний балл</span><b>${n ? avg.toFixed(1) : "—"}<span class="note"> / ${total}</span></b></div>
-        <div class="stat"><span class="note">70% и выше</span><b>${n ? passed : "—"}</b></div>
+        <div class="stat"><span class="note">Завершили</span><b>${finished.length}</b></div>
+        <div class="stat"><span class="note">В процессе</span><b>${inProgress}</b></div>
+        <div class="stat"><span class="note">Средний балл</span><b>${finished.length ? avg.toFixed(1) : "—"}<span class="note"> / ${total}</span></b></div>
       </div>
       <div class="row">
         <h2 class="grow">Студенты</h2>
@@ -117,15 +123,15 @@
         <button class="btn small ${sortBy === "name" ? "" : "ghost"}" data-sort="name">по фамилии</button>
         <button class="btn small ${sortBy === "score" ? "" : "ghost"}" data-sort="score">по баллу</button>
       </div>
-      ${n ? `<div class="table-scroll"><table>
-        <thead><tr><th>Студент</th><th>Балл</th><th>%</th><th class="hide-sm">Отправлено</th><th class="hide-sm"></th></tr></thead>
+      ${subs.length ? `<div class="table-scroll"><table>
+        <thead><tr><th>Студент</th><th>Верно</th><th>Статус</th><th class="hide-sm">Последний ответ</th><th class="hide-sm"></th></tr></thead>
         <tbody>${rows}</tbody></table></div>`
-      : `<div class="sheet"><p>Пока никто не прошёл тест.</p><p class="muted">Отправьте студентам ссылку на тест. Результаты появятся здесь, когда кто-нибудь отправит ответы; нажмите «Обновить».</p></div>`}
+      : `<div class="sheet"><p>Пока никто не начал тест.</p><p class="muted">Отправьте студентам ссылку на тест. Каждый ответ появляется здесь сразу, как только студент его отправил.</p></div>`}
       <h2>Какие вопросы даются сложнее</h2>
-      <p class="muted">Доля верных ответов по каждому вопросу.</p>
+      <p class="muted">Доля верных ответов среди тех, кто уже ответил на вопрос.</p>
       <div>${qstats}</div>`;
 
-    app.querySelector("#refresh").addEventListener("click", fetchData);
+    app.querySelector("#refresh").addEventListener("click", () => fetchData());
     app.querySelectorAll("[data-sort]").forEach(b => b.addEventListener("click", () => { sortBy = b.dataset.sort; render(); }));
     app.querySelectorAll("tr.person").forEach(tr => tr.addEventListener("click", () => {
       const id = Number(tr.dataset.id); open = open === id ? null : id; confirmDel = null; render();
@@ -139,6 +145,10 @@
       } catch (e) { b.textContent = "Не удалось удалить"; }
     }));
   }
+
+  setInterval(() => {
+    if (data && code && confirmDel === null && document.visibilityState === "visible") fetchData(true);
+  }, 15000);
 
   if (code) fetchData(); else login();
 })();

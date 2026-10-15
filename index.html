@@ -17,7 +17,7 @@
 <script>
 (function () {
   const Q = window.QUIZ;
-  const STORE = "quiz_" + Q.id;
+  const STORE = "quiz_" + Q.id + "_v2";
   const LETTERS = ["А", "Б", "В", "Г", "Д"];
   const app = document.getElementById("app");
 
@@ -38,26 +38,20 @@
   function fresh() {
     const order = {};
     Q.questions.forEach(q => { order[q.id] = shuffled(Object.keys(q.options)); });
-    return { step: "start", first: "", last: "", idx: 0, answers: {}, order, result: null };
+    // results[qid] = { answer, correct, correct_option, explanation } — приходит с сервера
+    return { step: "start", first: "", last: "", attempt: null, idx: 0, order, results: {} };
   }
 
   let state = load() || fresh();
-  if (state.step === "sending") state.step = "review";
+  let choice = null;   // выбранный, но ещё не отправленный вариант
+  let busy = false;
 
-  function el(html) {
-    const t = document.createElement("template");
-    t.innerHTML = html.trim();
-    return t.content;
-  }
-  function esc(s) {
-    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  }
+  const el = html => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content; };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const score = () => Object.values(state.results).filter(r => r.correct).length;
+
   function go(step) { state.step = step; save(); render(); window.scrollTo(0, 0); }
-
-  function render() {
-    app.textContent = "";
-    ({ start, question, review, done })[state.step === "sending" ? "review" : state.step]();
-  }
+  function render() { app.textContent = ""; ({ start, question, done })[state.step](); }
 
   function start() {
     app.append(el(`
@@ -66,7 +60,7 @@
         <p class="eyebrow">${esc(Q.module)}</p>
         <h1>${esc(Q.title)}</h1>
       </div>
-      <p class="muted">${Q.questions.length} вопросов по теории: композиция, баланс, визуальный центр, контраст и иерархия. В каждом вопросе один правильный ответ. Обычно это занимает 10–15 минут.</p>
+      <p class="muted">${Q.questions.length} вопросов по теории: композиция, баланс, визуальный центр, контраст и иерархия. После каждого ответа вы сразу увидите, верно ли, и короткое пояснение. Изменить отправленный ответ нельзя.</p>
       <form class="sheet" id="who" novalidate>
         <label class="field" for="first">Имя
           <input type="text" id="first" autocomplete="given-name" maxlength="60" required>
@@ -74,115 +68,142 @@
         <label class="field" for="last">Фамилия
           <input type="text" id="last" autocomplete="family-name" maxlength="60" required>
         </label>
-        <p class="error" id="who-err" hidden>Впишите имя и фамилию, чтобы преподаватель увидел ваш результат.</p>
-        <button class="btn" type="submit">Начать тест</button>
+        <p class="error" id="who-err" hidden></p>
+        <button class="btn" type="submit" id="go">Начать тест</button>
       </form>
     `));
     const f = document.getElementById("first"), l = document.getElementById("last");
+    const err = document.getElementById("who-err"), btn = document.getElementById("go");
     f.value = state.first; l.value = state.last;
-    document.getElementById("who").addEventListener("submit", e => {
+    document.getElementById("who").addEventListener("submit", async e => {
       e.preventDefault();
+      if (busy) return;
       const first = f.value.trim(), last = l.value.trim();
-      if (!first || !last) { document.getElementById("who-err").hidden = false; return; }
-      state.first = first; state.last = last; state.idx = 0;
-      go("question");
+      if (!first || !last) { err.hidden = false; err.textContent = "Впишите имя и фамилию, чтобы преподаватель увидел ваш результат."; return; }
+      busy = true; btn.disabled = true; btn.textContent = "Начинаем…";
+      try {
+        const r = await window.quizRpc("quiz_start", { p_quiz: Q.id, p_first_name: first, p_last_name: last });
+        state.first = first; state.last = last;
+        state.attempt = { id: r.attempt_id, token: r.token };
+        state.idx = 0;
+        busy = false;
+        go("question");
+      } catch (ex) {
+        busy = false; btn.disabled = false; btn.textContent = "Начать тест";
+        err.hidden = false; err.textContent = "Не получилось начать тест. Проверьте интернет и нажмите «Начать тест» ещё раз.";
+      }
     });
   }
 
   function question() {
     const q = Q.questions[state.idx];
     const total = Q.questions.length;
-    const chosen = state.answers[q.id];
-    const bars = Q.questions.map((qq, i) =>
-      `<span class="${i === state.idx ? "now" : (state.answers[qq.id] ? "done" : "")}"></span>`).join("");
-    const opts = state.order[q.id].map((k, i) => `
-      <button type="button" class="opt" role="radio" aria-checked="${chosen === k}" data-k="${k}">
+    const res = state.results[q.id];
+    const last = state.idx === total - 1;
+
+    const bars = Q.questions.map((qq, i) => {
+      const r = state.results[qq.id];
+      return `<span class="${r ? (r.correct ? "ok" : "no") : (i === state.idx ? "now" : "")}"></span>`;
+    }).join("");
+
+    const opts = state.order[q.id].map((k, i) => {
+      let cls = "", checked = choice === k;
+      if (res) {
+        if (k === res.correct_option) cls = "right";
+        else if (k === res.answer) cls = "wrong";
+        else cls = "dim";
+        checked = k === res.answer;
+      }
+      return `<button type="button" class="opt ${cls}" role="radio" aria-checked="${checked}" data-k="${k}" ${res ? "disabled" : ""}>
         <span class="key">${LETTERS[i]}</span><span>${esc(q.options[k])}</span>
-      </button>`).join("");
+      </button>`;
+    }).join("");
+
+    const feedback = res ? `
+      <div class="feedback ${res.correct ? "ok" : "no"}" role="status">
+        <b>${res.correct ? "Верно" : "Неверно"}</b>
+        ${res.correct ? "" : `<p>Правильный ответ: ${esc(q.options[res.correct_option])}</p>`}
+        <p>${esc(res.explanation)}</p>
+      </div>` : "";
+
+    const action = res
+      ? `<button type="button" class="btn" id="next">${last ? "Посмотреть результат" : "Следующий вопрос"}</button>`
+      : `<button type="button" class="btn" id="answer" ${choice ? "" : "disabled"}>Ответить</button>`;
+
     app.append(el(`
-      <div class="row">
-        <p class="eyebrow grow">Вопрос ${state.idx + 1} из ${total} · ${esc(q.topic)}</p>
-      </div>
+      <p class="eyebrow">Вопрос ${state.idx + 1} из ${total} · ${esc(q.topic)}</p>
       <div class="progress" style="grid-template-columns: repeat(${total}, 1fr)" aria-hidden="true">${bars}</div>
       <h2>${esc(q.text)}</h2>
       <div class="options" role="radiogroup" aria-label="Варианты ответа">${opts}</div>
-      <div class="row">
-        <button type="button" class="btn ghost" id="back">${state.idx === 0 ? "К началу" : "Назад"}</button>
-        <button type="button" class="btn grow" id="next" ${chosen ? "" : "disabled"}>${state.idx === total - 1 ? "Проверить ответы" : "Дальше"}</button>
-      </div>
+      ${feedback}
+      <p class="error" id="ans-err" hidden></p>
+      ${action}
     `));
-    app.querySelectorAll(".opt").forEach(b => b.addEventListener("click", () => {
-      state.answers[q.id] = b.dataset.k; save();
-      app.querySelectorAll(".opt").forEach(o => o.setAttribute("aria-checked", String(o === b)));
-      document.getElementById("next").disabled = false;
-    }));
-    document.getElementById("back").addEventListener("click", () => {
-      if (state.idx === 0) go("start"); else { state.idx--; go("question"); }
-    });
-    document.getElementById("next").addEventListener("click", () => {
-      if (state.idx === total - 1) go("review"); else { state.idx++; go("question"); }
-    });
-  }
 
-  function review() {
-    const missing = Q.questions.filter(q => !state.answers[q.id]);
-    const sending = state.step === "sending";
-    const list = Q.questions.map((q, i) => {
-      const k = state.answers[q.id];
-      const pos = k ? state.order[q.id].indexOf(k) : -1;
-      return `<button type="button" class="opt" data-i="${i}">
-        <span class="key">${i + 1}</span>
-        <span>${esc(q.text)}<br><span class="note">${k ? LETTERS[pos] + " · " + esc(q.options[k]) : "нет ответа"}</span></span>
-      </button>`;
-    }).join("");
-    app.append(el(`
-      <div>
-        <p class="eyebrow">${esc(state.first)} ${esc(state.last)}</p>
-        <h1>Проверьте ответы</h1>
-      </div>
-      <p class="muted">Нажмите на вопрос, чтобы изменить ответ. После отправки изменить ответы будет нельзя.</p>
-      <div class="options">${list}</div>
-      <p class="error" id="send-err" ${missing.length ? "" : "hidden"}>${missing.length ? "Остались вопросы без ответа: " + missing.length + "." : ""}</p>
-      <button type="button" class="btn" id="send" ${missing.length || sending ? "disabled" : ""}>${sending ? "Отправляем…" : "Отправить ответы"}</button>
-    `));
-    app.querySelectorAll(".opt").forEach(b => b.addEventListener("click", () => {
-      state.idx = Number(b.dataset.i); go("question");
-    }));
-    document.getElementById("send").addEventListener("click", submit);
-  }
-
-  async function submit() {
-    state.step = "sending"; render();
-    try {
-      const r = await window.quizRpc("quiz_submit", {
-        p_quiz: Q.id, p_first_name: state.first, p_last_name: state.last, p_answers: state.answers
+    if (res) {
+      document.getElementById("next").addEventListener("click", () => {
+        choice = null;
+        if (last) go("done"); else { state.idx++; go("question"); }
       });
-      state.result = { score: r.score, total: r.total, at: new Date().toISOString() };
-      go("done");
-    } catch (e) {
-      state.step = "review"; render();
-      const err = document.getElementById("send-err");
-      err.hidden = false;
-      err.textContent = "Ответы не отправились. Проверьте интернет и нажмите «Отправить ответы» ещё раз.";
+      return;
     }
+
+    const answerBtn = document.getElementById("answer");
+    app.querySelectorAll(".opt").forEach(b => b.addEventListener("click", () => {
+      if (busy) return;
+      choice = b.dataset.k;
+      app.querySelectorAll(".opt").forEach(o => o.setAttribute("aria-checked", String(o === b)));
+      answerBtn.disabled = false;
+    }));
+    answerBtn.addEventListener("click", async () => {
+      if (!choice || busy) return;
+      busy = true; answerBtn.disabled = true; answerBtn.textContent = "Проверяем…";
+      try {
+        const r = await window.quizRpc("quiz_answer", {
+          p_attempt_id: state.attempt.id, p_token: state.attempt.token, p_question_id: q.id, p_answer: choice
+        });
+        state.results[q.id] = r;
+        choice = null; busy = false;
+        save(); render();
+        // пояснение и кнопка «дальше» под вариантами — подкручиваем к ним на телефоне
+        const next = document.getElementById("next");
+        if (next) next.scrollIntoView({ block: "end", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      } catch (ex) {
+        busy = false; answerBtn.disabled = false; answerBtn.textContent = "Ответить";
+        const err = document.getElementById("ans-err");
+        err.hidden = false;
+        err.textContent = "Ответ не отправился. Проверьте интернет и нажмите «Ответить» ещё раз.";
+      }
+    });
   }
 
   function done() {
-    const r = state.result;
+    const total = Q.questions.length;
+    const list = Q.questions.map((q, i) => {
+      const r = state.results[q.id] || {};
+      return `<div class="qitem ${r.correct ? "ok" : "no"}"><span class="mk">${r.correct ? "✓" : "✗"}</span><span>${i + 1}. ${esc(q.text)}</span></div>`;
+    }).join("");
     app.append(el(`
       <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
       <div>
         <p class="eyebrow">${esc(state.first)} ${esc(state.last)}</p>
-        <h1>Ответы отправлены</h1>
+        <h1>Тест пройден</h1>
       </div>
       <div class="sheet">
         <p class="eyebrow">Ваш результат</p>
-        <p class="score">${r.score}<small> / ${r.total}</small></p>
-        <p class="muted">Преподаватель уже видит результат. Разбор ошибок будет на занятии.</p>
+        <p class="score">${score()}<small> / ${total}</small></p>
+        <p class="muted">Преподаватель уже видит ваши ответы.</p>
       </div>
+      <div class="summary">${list}</div>
     `));
   }
 
+  // если тест начат, но вопрос с текущим индексом уже отвечен и это не последний — продолжаем с первого неотвеченного
+  if (state.step === "question") {
+    const firstOpen = Q.questions.findIndex(q => !state.results[q.id]);
+    if (firstOpen === -1) state.step = "done";
+    else if (state.results[Q.questions[state.idx].id] === undefined) state.idx = firstOpen;
+  }
   render();
 })();
 </script>

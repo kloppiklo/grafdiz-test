@@ -146,3 +146,20 @@ tr.person:hover td { background: var(--paper); }
 @media (prefers-reduced-motion: no-preference) {
   .opt, .btn { transition: background-color .15s, border-color .15s; }
 }
+
+/* мгновенная проверка */
+.progress span.ok { background: var(--good); }
+.progress span.no { background: var(--bad); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--good); background: var(--good-soft); }
+.opt.right .key { background: var(--good); border-color: var(--good); color: var(--sheet); }
+.opt.wrong { border-color: var(--bad); background: var(--bad-soft); }
+.opt.wrong .key { background: var(--bad); border-color: var(--bad); color: var(--sheet); }
+.opt.dim { opacity: .55; }
+.feedback { border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 6px; border: 1px solid; }
+.feedback.ok { background: var(--good-soft); border-color: var(--good); }
+.feedback.no { background: var(--bad-soft); border-color: var(--bad); }
+.feedback b { font-family: var(--display); font-weight: 600; font-size: 18px; }
+.feedback.ok b { color: var(--good); }
+.feedback.no b { color: var(--bad); }
+.summary { display: flex; flex-direction: column; gap: 8px; }
