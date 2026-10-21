@@ -13,7 +13,13 @@ window.TESTS = [
     topics: ["Свет и глаз", "Цветовой круг", "Схемы", "Модели", "Психология"],
     theory: "materials/color.html"
   },
-  { id: "module2", status: "soon", color: "pink", title: "Сетка и типографика", module: "Модуль 2 · пары 05–10" },
+  {
+    id: "grid", status: "open", color: "lavender",
+    title: "Модульная сетка", module: "Модуль 2 · сетка", count: 12,
+    topics: ["Модуль", "История", "Принципы"],
+    theory: "materials/grid.html"
+  },
+  { id: "module2", status: "soon", color: "pink", title: "Типографика", module: "Модуль 2 · пары 08–10" },
   { id: "module3", status: "soon", color: "lavender", title: "Изображение и графическая система", module: "Модуль 3 · пары 11–16" },
   { id: "module4", status: "soon", color: "mint", title: "Illustrator и векторное мышление", module: "Модуль 4 · пары 17–24" },
   { id: "module5", status: "soon", color: "peach", title: "Плакат", module: "Модуль 5 · пары 25–28" },
@@ -24,7 +30,8 @@ window.TESTS = [
 // Сданные работы лежат в базе (quiz.submissions), проверка — в admin-otr.html.
 window.OTRABOTKI = [
   { id: "m1", status: "open", color: "yellow", title: "Визуальное мышление", module: "Модуль 1 · пары 01–04", pairs: 4 },
-  { id: "color", status: "open", color: "pink", title: "Колористика", module: "Модуль 2 · цвет", pairs: 4 }
+  { id: "color", status: "open", color: "pink", title: "Колористика", module: "Модуль 2 · цвет", pairs: 4 },
+  { id: "grid", status: "open", color: "lavender", title: "Модульная сетка", module: "Модуль 2 · сетка", pairs: 2 }
 ];
 
 // Имя студента запоминается на устройстве для всех тестов

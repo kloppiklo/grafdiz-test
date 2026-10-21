@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Модульная сетка</title>
+<style>
+/* Просмотр слайдов презентации «Модульная сетка» (экспорт из Figma Slides).
+   Встраивается в theory.html; листается кнопками, стрелками и свайпом. */
+:root {
+  --cream: #f6f0e2;
+  --ink: #141414;
+  --ink-2: #5d5a52;
+  --white: #ffffff;
+  --font: "Inter Tight", "Helvetica Neue", Arial, system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--cream); color: var(--ink); font: 15px/1.4 var(--font);
+  display: flex; flex-direction: column; gap: 12px; padding: 12px 16px max(16px, env(safe-area-inset-bottom));
+}
+.stage { flex: 1 1 auto; min-height: 0; display: grid; place-items: center; touch-action: pan-y; }
+.stage img {
+  max-width: 100%; max-height: 100%; aspect-ratio: 16 / 9; object-fit: contain;
+  background: var(--white); border-radius: 18px; box-shadow: 0 1px 0 rgba(20, 20, 20, .06);
+}
+.bar { display: flex; align-items: center; gap: 10px; justify-content: center; }
+.bar button {
+  appearance: none; border: 0; cursor: pointer; font: inherit;
+  width: 48px; height: 48px; border-radius: 50%; background: var(--ink); color: var(--white); font-size: 20px;
+}
+.bar button:disabled { opacity: .3; cursor: default; }
+.bar button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.count { min-width: 76px; text-align: center; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.dots { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
+.dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(20, 20, 20, .18); }
+.dots i.on { background: var(--ink); }
+</style>
+</head>
+<body>
+<div class="stage" id="stage"><img id="slide" alt=""></div>
+<div class="dots" id="dots" aria-hidden="true"></div>
+<div class="bar">
+  <button type="button" id="prev" aria-label="Предыдущий слайд">←</button>
+  <span class="count" id="count" aria-live="polite"></span>
+  <button type="button" id="next" aria-label="Следующий слайд">→</button>
+</div>
+
+<script>
+(function () {
+  // [файл, текст слайда для экранного диктора]
+  const SLIDES = [
+    ["01", "Модульная сетка. Это база, хотя многие так не считают"],
+    ["02", "Модульная сетка — универсальный инструмент для организации визуального пространства"],
+    ["03", "Пример: плакат с наложенной сеткой"],
+    ["04", "Примеры макетов на сетке"],
+    ["05", "Примеры макетов на сетке, Swiss Style"],
+    ["06", "Сетка помогает достичь согласованности элементов, установить связи между ними, задать визуальную систему и помочь ориентироваться. Привносит гармонию в дизайн"],
+    ["07", "Модуль — прямоугольник, элемент сетки"],
+    ["08", "Модульная сетка — вертикальные и горизонтальные линии, разделяющие страницу на прямоугольники"],
+    ["09", "Пример сетки"],
+    ["10", "Развороты на сетке и плакат Theater am Hechtplatz"],
+    ["11", "Примеры сеток"],
+    ["12", "Пример сетки в 4 колонки и 4 строки"],
+    ["13", "Немного истории: Йозеф Мюллер-Брокманн, Ян Чихольд, XX век. Типографика, журналы, газеты. Баухаус, Де Стиль, Швейцарский стиль"],
+    ["14", "Работы швейцарского стиля"],
+    ["15", "Плакат Theater am Hechtplatz и его сетка"],
+    ["16", "Вывод Мюллера: успех сетки зависит не только от того, как элементы размещены внутри неё, но и от того, как сама сетка расположена по отношению к своему контейнеру"],
+    ["17", "Плакаты Мюллер-Брокманна"],
+    ["19", "Принципы работы с сеткой: нет контента — нет сетки; сетка — часть дизайн-концепции; вертикальный ритм; интересные композиции"],
+    ["20", "Сетка как элемент дизайна"],
+    ["22", "Примеры: сетка как элемент дизайна"],
+    ["23", "Три правила: чистота, минимализм, воздух"],
+    ["24", "Но ты можешь определить для себя свои правила"]
+  ];
+  const img = document.getElementById("slide");
+  const prev = document.getElementById("prev"), next = document.getElementById("next");
+  const count = document.getElementById("count"), dots = document.getElementById("dots");
+  dots.innerHTML = SLIDES.map(() => "<i></i>").join("");
+  let i = 0;
+  try { i = Math.min(SLIDES.length - 1, Math.max(0, Number(sessionStorage.getItem("grid_slide")) || 0)); } catch (e) {}
+
+  function show(n) {
+    i = Math.min(SLIDES.length - 1, Math.max(0, n));
+    img.src = "grid/" + SLIDES[i][0] + ".jpg";
+    img.alt = SLIDES[i][1];
+    count.textContent = (i + 1) + " / " + SLIDES.length;
+    prev.disabled = i === 0; next.disabled = i === SLIDES.length - 1;
+    [...dots.children].forEach((d, k) => d.classList.toggle("on", k === i));
+    try { sessionStorage.setItem("grid_slide", i); } catch (e) {}
+    // подгружаем следующий слайд заранее
+    if (SLIDES[i + 1]) new Image().src = "grid/" + SLIDES[i + 1][0] + ".jpg";
+  }
+  prev.onclick = () => show(i - 1);
+  next.onclick = () => show(i + 1);
+  document.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); show(i + 1); }
+    if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); show(i - 1); }
+  });
+  let x0 = null;
+  const stage = document.getElementById("stage");
+  stage.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; }, { passive: true });
+  stage.addEventListener("touchend", e => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (Math.abs(dx) > 40) show(i + (dx < 0 ? 1 : -1));
+  });
+  stage.addEventListener("click", e => { show(i + (e.clientX > window.innerWidth / 2 ? 1 : -1)); });
+  show(i);
+})();
+</script>
+</body>
+</html>
