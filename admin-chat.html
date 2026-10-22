@@ -19,6 +19,7 @@
 
 <script src="tests.js"></script>
 <script src="config.js"></script>
+<script src="chat-kit.js"></script>
 <script src="admin-nav.js"></script>
 <script>
 // Чат группы для преподавателя: объявления и сообщения от имени преподавателя, удаление любых сообщений.
@@ -28,7 +29,9 @@
   const CODE_KEY = "quiz_admin_code";
   let code = "";
   try { code = sessionStorage.getItem(CODE_KEY) || ""; } catch (e) {}
-  let data = null, kind = "news", confirmDel = null, draft = "";
+  let data = null, kind = "news", confirmDel = null, draft = "", file = null;
+  const Kit = window.ChatKit;
+  const savePush = sub => window.quizRpc("push_admin_subscribe", { p_code: code, p_sub: sub });
 
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmt = iso => new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -78,11 +81,11 @@
     const ta = document.getElementById("body");
     if (ta) draft = ta.value;
     const news = data.news.map(n => `
-      <div class="news-item"><p>${text(n.body)}</p><span class="note">${fmt(n.created_at)} · ${delBtn(n.id)}</span></div>`).join("");
+      <div class="news-item">${n.body ? `<p>${text(n.body)}</p>` : ""}${Kit.attachment(n)}<span class="note">${fmt(n.created_at)} · ${delBtn(n.id)}</span></div>`).join("");
     const msgs = data.messages.slice().reverse().map(m => `
       <div class="msg ${m.is_teacher ? "teacher" : ""}">
         <b>${m.is_teacher ? "Преподаватель" : esc(m.last_name + " " + m.first_name)}</b>
-        <p>${text(m.body)}</p>
+        ${Kit.attachment(m)}${m.body ? `<p>${text(m.body)}</p>` : ""}
         <span class="note">${fmt(m.created_at)} · ${delBtn(m.id)}</span></div>`).join("");
     app.innerHTML = `
       <div class="topbar">
@@ -91,12 +94,16 @@
         <button type="button" class="icon-btn" id="refresh" aria-label="Обновить">↻</button>
       </div>
       <h1>Чат <em>группы</em></h1>
+      <div class="list push-row"><button type="button" class="li" id="push"></button></div>
       <form class="card lavender" id="post" novalidate>
         <div class="chips">
           <button type="button" class="chip ${kind === "news" ? "dark" : ""}" data-kind="news">Объявление</button>
           <button type="button" class="chip ${kind === "msg" ? "dark" : ""}" data-kind="msg">Сообщение в чат</button>
         </div>
         <textarea id="body" maxlength="1000" placeholder="${kind === "news" ? "Например: в четверг пара в 214 аудитории" : "Сообщение от имени преподавателя"}">${esc(draft)}</textarea>
+        <div class="att-pending" id="pending" ${file ? "" : "hidden"}>${file ? `<span class="grow">📎 ${esc(file.name || "Скриншот")}</span><button type="button" class="icon-btn" id="unpick" aria-label="Убрать файл">✕</button>` : ""}</div>
+        <label class="btn small ghost" for="file">Прикрепить файл или скриншот</label>
+        <input type="file" id="file" hidden>
         <p class="note ink">${kind === "news" ? "Объявление закрепится над чатом у всех студентов (показываются три последних)." : "Сообщение появится в общей ленте с подписью «Преподаватель»."}</p>
         <p class="error" id="post-err" hidden></p>
         <button class="btn block" type="submit">Опубликовать <span class="arr">→</span></button>
@@ -107,20 +114,32 @@
       ${msgs ? `<div class="chat chat-admin">${msgs}</div>` : `<p class="muted">В чате пока никто не писал.</p>`}`;
 
     app.querySelector("#refresh").onclick = fetchData;
+    Kit.pushButton(document.getElementById("push"), savePush);
+    const keep = () => { draft = document.getElementById("body").value; };
+    document.getElementById("file").onchange = e => { keep(); file = e.target.files[0] || null; render(); };
+    const un = document.getElementById("unpick"); if (un) un.onclick = () => { keep(); file = null; render(); };
+    document.getElementById("body").addEventListener("paste", e => {
+      const item = [...(e.clipboardData ? e.clipboardData.items : [])].find(i => i.kind === "file");
+      if (!item) return;
+      e.preventDefault(); keep();
+      const f = item.getAsFile(); file = new File([f], "Скриншот.png", { type: f.type }); render();
+    });
     app.querySelectorAll("[data-kind]").forEach(b => b.onclick = () => { kind = b.dataset.kind; render(); });
     app.querySelector("#post").addEventListener("submit", async e => {
       e.preventDefault();
       const body = document.getElementById("body").value.trim();
-      if (!body) return;
+      if (!body && !file) return;
       const btn = e.target.querySelector("button[type=submit]");
       btn.disabled = true;
       try {
-        await window.quizRpc("chat_admin_send", { p_code: code, p_kind: kind, p_body: body });
-        document.getElementById("body").value = ""; draft = "";
+        let up = null;
+        if (file) { try { up = await Kit.upload(file); } catch (ex) { ex.upload = true; throw ex; } }
+        await window.quizRpc("chat_admin_send", { p_code: code, p_kind: kind, p_body: body, p_file: up });
+        document.getElementById("body").value = ""; draft = ""; file = null;
         fetchData();
       } catch (ex) {
         btn.disabled = false;
-        const err = document.getElementById("post-err"); err.textContent = "Не получилось опубликовать. Попробуйте ещё раз."; err.hidden = false;
+        const err = document.getElementById("post-err"); err.textContent = ex.upload ? ex.message : "Не получилось опубликовать. Попробуйте ещё раз."; err.hidden = false;
       }
     });
     app.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { confirmDel = Number(b.dataset.del); render(); });

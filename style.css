@@ -685,3 +685,34 @@ table.journal-table th.lesson .pick-face svg { display: block; flex: none; }
 /* выход из аккаунта в профиле */
 .logout-btn { color: var(--bad); }
 .logout-confirm p { margin: 0; }
+
+/* чат: вложения и уведомления */
+.push-row { padding: 0 16px; }
+.push-row .li { border-bottom: 0; }
+.push-row .li:disabled { opacity: 1; cursor: default; }
+.push-row .li:disabled small { color: var(--ink-2); }
+.att-img { display: block; margin: 4px 0 2px; border-radius: 14px; overflow: hidden; max-width: 260px; background: var(--cream); }
+.att-img img { display: block; width: 100%; height: auto; max-height: 320px; object-fit: cover; }
+.att-file { display: flex; align-items: center; gap: 10px; margin: 4px 0 2px; padding: 8px 12px 8px 8px; border-radius: 14px;
+            background: var(--cream); color: var(--ink); text-decoration: none; min-width: 0; }
+.att-file b { display: block; font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
+.att-file small { display: block; font-size: 12px; color: var(--ink-2); }
+.att-file .grow { min-width: 0; }
+.att-ext { flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--ink); color: var(--white);
+           display: grid; place-items: center; font-size: 10px; font-weight: 600; letter-spacing: .02em; }
+.msg.me .att-file { background: rgba(255, 255, 255, .14); color: var(--white); }
+.msg.me .att-file small { color: rgba(255, 255, 255, .65); }
+.msg.me .att-ext { background: var(--white); color: var(--ink); }
+.news-item .att-file, .msg.teacher .att-file { background: rgba(255, 255, 255, .7); }
+.composer { flex-direction: column; align-items: stretch; gap: 4px; }
+.composer-row { display: flex; gap: 6px; align-items: flex-end; }
+.attach { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-2); cursor: pointer; }
+.attach:hover { background: var(--cream); color: var(--ink); }
+.attach svg { width: 22px; height: 22px; }
+.att-pending { display: flex; align-items: center; gap: 10px; background: var(--cream); border-radius: 22px; padding: 6px 6px 6px 8px; font-size: 14px; }
+.att-pending[hidden] { display: none; }
+.att-pending img { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; }
+.att-pending .grow { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-pending .icon-btn { width: 32px; height: 32px; font-size: 14px; }
+.send.busy { animation: chat-busy 1s linear infinite; }
+@keyframes chat-busy { 50% { opacity: .4; } }

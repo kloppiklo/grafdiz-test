@@ -23,6 +23,7 @@
 
 <script src="tests.js"></script>
 <script src="config.js"></script>
+<script src="chat-kit.js"></script>
 <script>
 // Главная-приложение: при первом запуске — welcome и знакомство (имя хранится на телефоне),
 // дальше — вкладки: главная, тесты, отработки, теория, прогресс, чат, профиль. Вкладка — в адресе (#theory и т. п.).
@@ -169,6 +170,7 @@
       if (!first || !last) { document.getElementById("reg-err").hidden = false; return; }
       window.Student.set(first, last);
       write(ONBOARDED, true);
+      if (Kit) Kit.refreshPush(savePush);
       show(fromProfile ? "profile" : "home");
     });
   }
@@ -429,6 +431,7 @@
   // Выход: стираем всё, что приложение хранит на устройстве о студенте (имя, фото, прогресс,
   // токены отработок и своих сообщений в чате), и показываем знакомство заново.
   function logout() {
+    if (Kit) Kit.disablePush().catch(() => {});
     try {
       Object.keys(localStorage)
         .filter(k => k.startsWith("quiz_") || k.startsWith("otr_"))
@@ -441,8 +444,11 @@
 
   // ---------- чат группы: объявления преподавателя сверху, общая лента ниже.
   // Лента обновляется каждые 8 секунд, пока открыта вкладка. Свои сообщения можно удалить (ключ — на этом устройстве).
+  // К сообщению можно прикрепить один файл или скриншот (кнопка-скрепка или вставка из буфера), уведомления — кнопкой над лентой.
   const MINE = "quiz_chat_mine";
-  let chatTimer = null, chatData = null;
+  let chatTimer = null, chatData = null, chatFile = null;
+  const Kit = window.ChatKit;
+  const savePush = sub => { const w = window.Student.get(); return window.quizRpc("push_subscribe", { p_sub: sub, p_first_name: w.first, p_last_name: w.last }); };
   const sameName = (m, who) => !m.is_teacher && m.first_name.toLowerCase() === who.first.toLowerCase() && m.last_name.toLowerCase() === who.last.toLowerCase();
   const chatTime = iso => {
     const d = new Date(iso), today = new Date().toDateString() === d.toDateString();
@@ -453,32 +459,68 @@
   function chatTab() {
     app.innerHTML = `
       <h1>Чат <em>группы</em></h1>
+      ${Kit ? `<div class="list push-row"><button type="button" class="li" id="push"></button></div>` : ""}
       <div id="news"></div>
       <div class="chat" id="feed"><p class="note">Загружаем сообщения…</p></div>
       <form class="composer" id="send" novalidate>
-        <textarea id="msg" rows="1" maxlength="1000" placeholder="Сообщение для группы" aria-label="Сообщение"></textarea>
-        <button class="send" type="submit" aria-label="Отправить">↑</button>
+        <div class="att-pending" id="pending" hidden></div>
+        <div class="composer-row">
+          ${Kit ? `<label class="attach" for="file" aria-label="Прикрепить файл или скриншот" title="Прикрепить файл или скриншот">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg></label>
+          <input type="file" id="file" hidden>` : ""}
+          <textarea id="msg" rows="1" maxlength="1000" placeholder="Сообщение для группы" aria-label="Сообщение"></textarea>
+          <button class="send" type="submit" aria-label="Отправить">↑</button>
+        </div>
       </form>
       <p class="error" id="chat-err" hidden></p>`;
     const form = document.getElementById("send"), ta = document.getElementById("msg"), err = document.getElementById("chat-err");
+    chatFile = null;
+    if (Kit) {
+      Kit.pushButton(document.getElementById("push"), savePush);
+      const pending = document.getElementById("pending"), input = document.getElementById("file");
+      const pick = f => {
+        chatFile = f || null; err.hidden = true;
+        if (!chatFile) { pending.hidden = true; pending.innerHTML = ""; input.value = ""; return; }
+        const thumb = /^image\//.test(f.type) ? `<img src="${URL.createObjectURL(f)}" alt="">` : `<span class="att-ext">${esc(((/\.(\w{1,5})$/.exec(f.name) || [])[1] || "файл").toUpperCase())}</span>`;
+        pending.innerHTML = `${thumb}<span class="grow">${esc(f.name || "Скриншот")}</span><button type="button" class="icon-btn" id="unpick" aria-label="Убрать файл">✕</button>`;
+        pending.hidden = false;
+        document.getElementById("unpick").onclick = () => pick(null);
+      };
+      input.onchange = () => pick(input.files[0]);
+      // скриншот из буфера обмена: Ctrl/Cmd+V в поле сообщения
+      ta.addEventListener("paste", e => {
+        const item = [...(e.clipboardData ? e.clipboardData.items : [])].find(i => i.kind === "file");
+        if (!item) return;
+        e.preventDefault();
+        const f = item.getAsFile();
+        pick(new File([f], f.name && f.name !== "image.png" ? f.name : "Скриншот.png", { type: f.type }));
+      });
+    }
     const grow = () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 160) + "px"; };
     ta.addEventListener("input", grow);
     ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && window.matchMedia("(hover: hover)").matches) { e.preventDefault(); form.requestSubmit(); } });
     form.addEventListener("submit", async e => {
       e.preventDefault();
       const body = ta.value.trim();
-      if (!body) return;
-      const who = window.Student.get(), btn = form.querySelector("button");
+      if (!body && !chatFile) return;
+      const who = window.Student.get(), btn = form.querySelector(".send");
       btn.disabled = true; err.hidden = true;
       try {
-        const r = await window.quizRpc("chat_send", { p_first_name: who.first, p_last_name: who.last, p_body: body });
+        let file = null;
+        if (chatFile) {
+          btn.classList.add("busy");
+          try { file = await Kit.upload(chatFile); } catch (ex) { ex.upload = true; throw ex; }
+        }
+        const r = await window.quizRpc("chat_send", { p_first_name: who.first, p_last_name: who.last, p_body: body, p_file: file });
         const mine = read(MINE) || {}; mine[r.id] = r.token; write(MINE, mine);
         ta.value = ""; grow();
+        const un = document.getElementById("unpick"); if (un) un.click();
         await loadChat(true);
       } catch (ex) {
-        err.textContent = /too fast/.test(ex.message) ? "Слишком много сообщений подряд — подождите минуту." : "Не получилось отправить. Проверьте интернет и попробуйте ещё раз.";
+        err.textContent = ex.upload ? ex.message : /too fast/.test(ex.message) ? "Слишком много сообщений подряд — подождите минуту." : "Не получилось отправить. Проверьте интернет и попробуйте ещё раз.";
         err.hidden = false;
       }
+      btn.classList.remove("busy");
       btn.disabled = false; ta.focus();
     });
     loadChat(true);
@@ -498,7 +540,7 @@
     const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 160;
     news.innerHTML = chatData.news.length ? `
       <section class="card yellow news"><p class="eyebrow ink">Объявления</p>
-        ${chatData.news.slice(0, 3).map(n => `<div class="news-item"><p>${chatText(n.body)}</p><span class="note">${chatTime(n.created_at)}</span></div>`).join("")}
+        ${chatData.news.slice(0, 3).map(n => `<div class="news-item">${n.body ? `<p>${chatText(n.body)}</p>` : ""}${Kit ? Kit.attachment(n) : ""}<span class="note">${chatTime(n.created_at)}</span></div>`).join("")}
       </section>` : "";
     let prevDay = "";
     feed.innerHTML = chatData.messages.length ? chatData.messages.map(m => {
@@ -506,7 +548,7 @@
       const sep = day !== prevDay ? `<p class="chat-day">${day}</p>` : ""; prevDay = day;
       return `${sep}<div class="msg ${me ? "me" : ""} ${m.is_teacher ? "teacher" : ""}">
         ${me ? "" : `<b>${m.is_teacher ? "Преподаватель" : esc(m.first_name + " " + m.last_name)}</b>`}
-        <p>${chatText(m.body)}</p>
+        ${Kit ? Kit.attachment(m) : ""}${m.body ? `<p>${chatText(m.body)}</p>` : ""}
         <span class="note">${chatTime(m.created_at)}${mine[m.id] ? ` · <button type="button" class="linkbtn inline" data-del="${m.id}">удалить</button>` : ""}</span></div>`;
     }).join("") : `<div class="card mint"><h2>Здесь пока тихо</h2><p>Напишите первое сообщение: вопрос по заданию, полезная ссылка или просто «привет».</p></div>`;
     feed.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", async () => {
@@ -514,7 +556,12 @@
       try { await window.quizRpc("chat_delete_own", { p_id: Number(id), p_token: mine[id] }); delete mine[id]; write(MINE, mine); loadChat(false); }
       catch (e) { b.textContent = "не удалось"; }
     }));
-    if (toBottom || nearBottom) window.scrollTo(0, document.body.scrollHeight);
+    if (toBottom || nearBottom) {
+      const down = () => window.scrollTo(0, document.body.scrollHeight);
+      down();
+      // картинки догружаются позже и сдвигают ленту — докручиваем после каждой
+      feed.querySelectorAll(".att-img img").forEach(img => { if (!img.complete) img.addEventListener("load", down, { once: true }); });
+    }
   }
 
   const VIEWS = { home: homeTab, tests: testsTab, otr: otrTab, theory: theoryTab, progress: progressTab, chat: chatTab, profile: profileTab };
