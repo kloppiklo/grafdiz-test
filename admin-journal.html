@@ -19,6 +19,7 @@
 
 <script src="tests.js"></script>
 <script src="config.js"></script>
+<script src="admin-nav.js"></script>
 <script>
 // Журнал преподавателя: успеваемость (тесты, теория, отработки, посещаемость), журнал посещений
 // по занятиям и расписание (даты занятий привязаны к темам — парам программы).
@@ -37,6 +38,7 @@
   let view = (location.hash || "#perf").slice(1);
   if (!VIEWS.some(v => v[0] === view)) view = "perf";
   let D = null, openStudent = null, mergeFor = null, busy = false, flash = "";
+  let markDate = null, markPair = null;   // карточка «Отметить занятие»
 
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const dShort = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" }).replace(".", "") : "";
@@ -49,7 +51,7 @@
   // ---------- вход
   function login(errText) {
     app.innerHTML = `
-      <div class="topbar"><a class="icon-btn" href="admin.html" aria-label="К результатам тестов">←</a><span class="chip">Для преподавателя</span></div>
+      <div class="topbar"><span class="chip">Для преподавателя</span></div>
       <h1>Журнал <em>группы</em></h1>
       <form class="card lavender login" id="login" novalidate>
         <label class="field" for="code">Код преподавателя
@@ -132,18 +134,13 @@
   // ---------- общий каркас
   function render() {
     const ts = document.querySelector(".table-scroll"), keepX = ts ? ts.scrollLeft : 0, keepY = window.scrollY;
-    const nav = VIEWS.map(([id, label]) => `<a class="chip ${id === view ? "dark" : ""}" href="#${id}">${label}</a>`).join("");
     app.innerHTML = `
       <div class="topbar">
-        <a class="icon-btn" href="./" aria-label="На главную">←</a><span class="chip">Для преподавателя</span>
+        <span class="chip">Для преподавателя</span>
         <span class="grow"></span>
-        <a class="btn small ghost" href="admin.html">Тесты</a>
-        <a class="btn small ghost" href="admin-otr.html">Отработки</a>
-        <a class="btn small ghost" href="admin-chat.html">Чат</a>
         <button type="button" class="icon-btn" id="refresh" aria-label="Обновить">↻</button>
       </div>
-      <h1>Журнал <em>группы</em></h1>
-      <div class="chips">${nav}</div>
+      <h1>${{ perf: "Успеваемость", journal: "Журнал", schedule: "Расписание" }[view]}</h1>
       ${flash ? `<p class="error">${esc(flash)}</p>` : ""}
       <div id="view"></div>`;
     flash = "";
@@ -250,10 +247,71 @@
   }
 
   // ---------- журнал посещений: ученики × занятия с датами
+  // ---------- отметить занятие: дата → тема → кто был
+  function markCard() {
+    if (!markDate) markDate = D.today;
+    const onDate = D.lessons.find(l => l.lesson_date === markDate);
+    if (!markPair) {   // по умолчанию: тема, у которой уже стоит эта дата, иначе первая тема без даты
+      markPair = onDate ? onDate.pair : (D.lessons.find(l => !l.lesson_date) || D.lessons[0]).pair;
+    }
+    const L = D.lessons.find(l => l.pair === markPair);
+    const bound = L.lesson_date === markDate;
+    const opts = D.lessons.map(l => `<option value="${l.pair}" ${l.pair === markPair ? "selected" : ""}>${pairNo(l.pair)} · ${esc(l.title)}${l.lesson_date ? " — " + dShort(l.lesson_date) : ""}</option>`).join("");
+    const bindBtn = bound ? `<span class="pill good">тема привязана к дате</span>`
+      : `<button type="button" class="btn small" id="m-bind">${L.lesson_date ? "Перенести тему на " + dShort(markDate) : "Привязать тему к " + dShort(markDate)}</button>
+         ${L.lesson_date ? `<span class="note ink">Сейчас у этой темы стоит ${dLong(L.lesson_date)}.</span>` : ""}`;
+    const cnt = S.filter(st => st.marks[markPair] === true).length;
+    const roster = S.map(st => {
+      const v = bound ? st.marks[markPair] : undefined;
+      return `<div class="li mark-row">
+        <span class="avatar sm" style="background:var(--${colorOf(st.key)})">${esc((st.first[0] || "") + (st.last[0] || "")).toUpperCase()}</span>
+        <div class="grow">${esc(st.last)} ${esc(st.first)}${v === undefined && bound && markDate <= D.today ? `<small>не отмечен — получит отработку</small>` : ""}</div>
+        <div class="seg" role="group" aria-label="${esc(st.last + " " + st.first)}">
+          <button type="button" class="seg-b ${v === true ? "on was" : ""}" data-mk="${esc(st.key)}" data-v="1" ${bound ? "" : "disabled"}>Был</button>
+          <button type="button" class="seg-b ${v === false ? "on miss" : ""}" data-mk="${esc(st.key)}" data-v="0" ${bound ? "" : "disabled"}>Не был</button>
+        </div></div>`;
+    }).join("");
+    return `<section class="card lavender mark-card">
+      <h2>Отметить занятие</h2>
+      <div class="mark-fields">
+        <label class="field" for="m-date">Дата<input type="date" id="m-date" class="date-in" value="${markDate}"></label>
+        <label class="field grow" for="m-pair">Тема (пара программы)<select id="m-pair">${opts}</select></label>
+      </div>
+      <div class="row">${bindBtn}</div>
+      ${S.length ? `<div class="row"><h3 class="grow">Кто был${bound ? ` · ${cnt} из ${S.length}` : ""}</h3>${bound ? `<button type="button" class="btn small ghost" id="m-all">Все были</button>` : ""}</div>
+        ${bound ? "" : `<p class="note ink">Сначала привяжите тему к дате — потом отметьте присутствие.</p>`}
+        <div class="list">${roster}</div>`
+      : `<p class="note ink">Ученики появятся автоматически, когда начнут проходить тесты или откроют теорию.</p>`}
+    </section>`;
+  }
+  function bindMark(el) {
+    el.querySelector("#m-date").addEventListener("change", e => { markDate = e.target.value || D.today; markPair = null; render(); });
+    el.querySelector("#m-pair").addEventListener("change", e => { markPair = Number(e.target.value); render(); });
+    const b = el.querySelector("#m-bind");
+    if (b) b.onclick = () => call("journal_set_date", { p_pair: markPair, p_date: markDate });
+    el.querySelectorAll("[data-mk]").forEach(x => x.addEventListener("click", () => {
+      if (busy) return;
+      const st = S.find(q => q.key === x.dataset.mk), want = x.dataset.v === "1";
+      const next = st.marks[markPair] === want ? null : want;   // повторное нажатие снимает отметку
+      if (next === null) delete st.marks[markPair]; else st.marks[markPair] = next;
+      call("journal_set_present", { p_pair: markPair, p_key: st.key, p_present: next });
+    }));
+    const all = el.querySelector("#m-all");
+    if (all) all.onclick = async () => {
+      if (busy) return;
+      busy = true; all.textContent = "Сохраняем…";
+      for (const st of S) if (st.marks[markPair] !== true) {
+        try { await window.quizRpc("journal_set_present", { p_code: code, p_pair: markPair, p_key: st.key, p_present: true }); } catch (e) { flash = "Часть отметок не сохранилась. Проверьте интернет."; }
+      }
+      busy = false; load(true);
+    };
+  }
+
   function renderJournal(el) {
     const dated = D.lessons.filter(l => l.lesson_date).sort((a, b) => a.lesson_date.localeCompare(b.lesson_date) || a.pair - b.pair);
     if (!dated.length) {
-      el.innerHTML = `<div class="card yellow"><h2>Сначала задайте даты занятий</h2><p>Во вкладке «Расписание» поставьте дату напротив каждой пары — здесь появятся колонки журнала.</p><a class="btn" href="#schedule">Открыть расписание <span class="arr">→</span></a></div>`;
+      el.innerHTML = markCard() + `<p class="note">Когда у занятий появятся даты, ниже будет общая таблица посещений. Даты всех пар можно поставить и разом — в «Расписании».</p>`;
+      bindMark(el);
       return;
     }
     const head = dated.map(l => `<th class="lesson ${l.lesson_date > D.today ? "future" : ""}" title="${esc(l.title)}"><span>${dShort(l.lesson_date)}</span><small>${pairNo(l.pair)}</small></th>`).join("");
@@ -264,7 +322,8 @@
         return `<td class="mark"><button type="button" class="att ${st[0]}" data-pair="${l.pair}" data-key="${esc(s.key)}" title="${esc(st[2])}" aria-label="${esc(s.last + " " + s.first + ", пара " + pairNo(l.pair) + ": " + st[2])}">${st[1]}</button></td>`;
       }).join("")}</tr>`).join("");
     const totals = dated.map(l => `<td class="mark total">${S.filter(s => s.marks[l.pair] === true).length}</td>`).join("");
-    el.innerHTML = `
+    el.innerHTML = markCard() + `
+      <h2 class="sub">Все занятия</h2>
       <p class="muted">Нажмите на клетку: <b>✓ был</b> → <b>Н не был</b> → пусто. Если на прошедшем занятии ученик не отмечен как присутствующий, ему автоматически назначается отработка этой темы — клетка покажет <b>О</b>, а ученик увидит отработку у себя на главной.</p>
       <div class="table-scroll"><table class="journal-table">
         <thead><tr><th class="sticky">Ученик</th>${head}</tr></thead>
@@ -272,6 +331,7 @@
       <div class="row"><span class="legend"><i class="att was">✓</i> был(а)</span><span class="legend"><i class="att miss">Н</i> не был(а)</span><span class="legend"><i class="att owe">О</i> не отмечен — отработка</span></div>
       <h2 class="sub">Отметить всех на занятии</h2>
       <div class="row">${dated.filter(l => l.lesson_date <= D.today).slice(-4).map(l => `<button type="button" class="btn small ghost" data-all="${l.pair}">${pairNo(l.pair)} · ${dShort(l.lesson_date)}: все были</button>`).join("")}</div>`;
+    bindMark(el);
     el.querySelectorAll("button.att").forEach(b => b.addEventListener("click", () => {
       if (busy) return;
       const pair = Number(b.dataset.pair), key = b.dataset.key;

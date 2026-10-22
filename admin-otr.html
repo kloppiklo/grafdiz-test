@@ -19,6 +19,7 @@
 
 <script src="tests.js"></script>
 <script src="config.js"></script>
+<script src="admin-nav.js"></script>
 <script>
 // Проверка отработок: сдачи студентов по модулю, отметка «засчитано / на доработку» с комментарием.
 // Код преподавателя тот же, что в admin.html (хранится до закрытия вкладки).
@@ -54,7 +55,7 @@
 
   function login(errText) {
     app.innerHTML = `
-      <div class="topbar"><a class="icon-btn" href="admin.html" aria-label="К результатам тестов">←</a><span class="chip">Для преподавателя</span></div>
+      <div class="topbar"><span class="chip">Для преподавателя</span></div>
       <h1>Сдачи <em>отработок</em></h1>
       <form class="card lavender login" id="login" novalidate>
         <label class="field" for="code">Код преподавателя
@@ -134,10 +135,8 @@
 
     app.innerHTML = `
       <div class="topbar">
-        <a class="icon-btn" href="admin.html" aria-label="К результатам тестов">←</a><span class="chip">Для преподавателя</span>
+        <span class="chip">Для преподавателя</span>
         <span class="grow"></span>
-        <a class="btn small" href="admin-journal.html">Журнал</a>
-        <a class="btn small ghost" href="admin-chat.html">Чат</a>
         <button type="button" class="icon-btn" id="refresh" aria-label="Обновить">↻</button>
       </div>
       <h1>Сдачи <em>отработок</em></h1>

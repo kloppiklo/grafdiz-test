@@ -23,6 +23,7 @@
 
 <script src="tests.js"></script>
 <script src="config.js"></script>
+<script src="admin-nav.js"></script>
 <script>
 (function () {
   const app = document.getElementById("app");
@@ -34,7 +35,7 @@
   try { code = sessionStorage.getItem(CODE_KEY) || ""; } catch (e) {}
   let testId = new URLSearchParams(location.search).get("t");
   if (!OPEN_TESTS.some(t => t.id === testId)) testId = OPEN_TESTS[0].id;
-  let Q = null, data = null, open = null, sortBy = "date", confirmDel = null;
+  let Q = null, data = null, open = null, openAttempt = null, sortBy = "date", confirmDel = null;
   const questionCache = {};
 
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -61,7 +62,7 @@
 
   function login(errText) {
     app.innerHTML = `
-      <div class="topbar"><a class="icon-btn" href="./" aria-label="На главную">←</a><span class="chip">Для преподавателя</span></div>
+      <div class="topbar"><span class="chip">Для преподавателя</span></div>
       <h1>Результаты <em>тестов</em></h1>
       <form class="card lavender login" id="login" novalidate>
         <label class="field" for="code">Код преподавателя
@@ -114,37 +115,65 @@
     const share = students ? latestDone.length / students : 0;
     const C = 2 * Math.PI * 46;
 
-    const subs = all.slice();
-    if (sortBy === "name") subs.sort((a, b) => personKey(a).localeCompare(personKey(b), "ru") || a.try - b.try);
-    else if (sortBy === "score") subs.sort((a, b) => b.score - a.score);
-    else subs.sort((a, b) => (b.last_at || b.created_at).localeCompare(a.last_at || a.created_at));
+    // одна строка на студента: последняя завершённая попытка + сколько раз выполнял
+    const people = Object.entries(byPerson).map(([key, list]) => {
+      const done = list.filter(s => s.answered >= total);
+      const shown = done[done.length - 1] || list[list.length - 1];
+      const best = done.reduce((b, s) => !b || s.score > b.score ? s : b, null);
+      const active = list.filter(s => s.answered < total).pop();
+      const lastAt = list.reduce((m, s) => (s.last_at || s.created_at) > m ? (s.last_at || s.created_at) : m, "");
+      return { key, list, done, shown, best, active, lastAt };
+    });
+    if (sortBy === "name") people.sort((a, b) => a.key.localeCompare(b.key, "ru"));
+    else if (sortBy === "score") people.sort((a, b) => (b.done.length ? b.shown.score : -1) - (a.done.length ? a.shown.score : -1));
+    else people.sort((a, b) => b.lastAt.localeCompare(a.lastAt));
+    const subs = people;
 
-    const rows = subs.map(s => {
+    const answersHtml = s => Q.questions.map(q => {
+      const a = s.answers[q.id];
+      if (a === undefined) return `<div class="qitem"><span class="mk">·</span><span><b>${q.id}.</b> ${esc(q.text)}<br><span class="note">Ещё не ответил(а)</span></span></div>`;
+      const ok = a === data.key[q.id];
+      return `<div class="qitem ${ok ? "ok" : "no"}"><span class="mk">${ok ? "✓" : "✗"}</span>
+        <span><b>${q.id}.</b> ${esc(q.text)}${ok ? "" : `<br><span class="note">Ответ: ${esc(q.options[a] || a)}<br>Верно: ${esc(q.options[data.key[q.id]])}</span>`}</span></div>`;
+    }).join("");
+
+    const rows = people.map(P => {
+      const s = P.shown;
       const isDone = s.answered >= total;
-      const isOpen = open === s.id;
+      const isOpen = open === P.key;
       const initials = (s.first_name[0] || "") + (s.last_name[0] || "");
-      const color = AVATAR[[...personKey(s)].reduce((h, c) => h + c.charCodeAt(0), 0) % AVATAR.length];
+      const color = AVATAR[[...P.key].reduce((h, c) => h + c.charCodeAt(0), 0) % AVATAR.length];
+      const status = [
+        P.done.length ? `выполнений: ${P.done.length}` : P.active ? "" : "ещё не завершил(а)",
+        P.best && P.done.length > 1 && P.best.score !== s.score ? `лучший ${P.best.score} / ${total}` : "",
+        P.active ? `не закончена попытка: ${P.active.answered} из ${total}` : "",
+        fmt(P.lastAt)
+      ].filter(Boolean).join(" · ");
       let detail = "";
       if (isOpen) {
-        const items = Q.questions.map(q => {
-          const a = s.answers[q.id];
-          if (a === undefined) return `<div class="qitem"><span class="mk">·</span><span><b>${q.id}.</b> ${esc(q.text)}<br><span class="note">Ещё не ответил(а)</span></span></div>`;
-          const ok = a === data.key[q.id];
-          return `<div class="qitem ${ok ? "ok" : "no"}"><span class="mk">${ok ? "✓" : "✗"}</span>
-            <span><b>${q.id}.</b> ${esc(q.text)}${ok ? "" : `<br><span class="note">Ответ: ${esc(q.options[a] || a)}<br>Верно: ${esc(q.options[data.key[q.id]])}</span>`}</span></div>`;
+        const sel = P.list.find(x => x.id === openAttempt) || s;
+        const tries = P.list.slice().reverse().map(a => {
+          const d = a.answered >= total;
+          return `<div class="try ${a.id === sel.id ? "on" : ""}">
+            <button type="button" class="try-pick" data-pick="${a.id}">
+              <span class="try-n">Попытка ${a.try}</span>
+              <span class="note">${fmt(a.last_at || a.created_at)}${d ? "" : " · не завершена"}</span>
+              <span class="pill ${d ? pillCls(a.score / total) : "wait"}">${a.score} / ${total}</span>
+            </button>
+            ${confirmDel === a.id
+              ? `<span class="row"><button class="btn small" data-del-yes="${a.id}">Удалить</button><button class="btn small ghost" data-del-no>Отмена</button></span>`
+              : `<button class="linkbtn" data-del="${a.id}">удалить</button>`}
+          </div>`;
         }).join("");
-        const del = confirmDel === s.id
-          ? `<span class="note grow">Удалить эту попытку без возможности восстановить?</span>
-             <button class="btn small" data-del-yes="${s.id}">Удалить</button>
-             <button class="btn small ghost" data-del-no>Отмена</button>`
-          : `<button class="btn small ghost" data-del="${s.id}">Удалить попытку</button>`;
-        detail = `<div class="person-detail"><div class="qlist">${items}</div><div class="row">${del}</div></div>`;
+        detail = `<div class="person-detail">
+          ${P.list.length > 1 ? `<div class="tries">${tries}</div><p class="note">Ответы попытки ${sel.try}:</p>` : `<div class="tries">${tries}</div>`}
+          <div class="qlist">${answersHtml(sel)}</div></div>`;
       }
       return `<div class="person-card ${isOpen ? "open" : ""}">
-        <button type="button" class="person" data-id="${s.id}" aria-expanded="${isOpen}">
+        <button type="button" class="person" data-key="${esc(P.key)}" aria-expanded="${isOpen}">
           <span class="avatar" style="background: var(--${color})">${esc(initials.toUpperCase())}</span>
           <span class="who"><b>${esc(s.last_name)} ${esc(s.first_name)}</b>
-            <span class="note">${s.tries > 1 ? "попытка " + s.try + " · " : ""}${isDone ? "готово" : "отвечает: " + s.answered + " из " + total} · ${fmt(s.last_at || s.created_at)}</span></span>
+            <span class="note">${status}</span></span>
           <span class="pill ${isDone ? pillCls(s.score / total) : "wait"}">${s.score} / ${total}</span>
           <span class="chev" aria-hidden="true">${isOpen ? "⌃" : "›"}</span>
         </button>
@@ -162,11 +191,8 @@
 
     app.innerHTML = `
       <div class="topbar">
-        <a class="icon-btn" href="./" aria-label="На главную">←</a><span class="chip">Для преподавателя</span>
+        <span class="chip">Для преподавателя</span>
         <span class="grow"></span>
-        <a class="btn small" href="admin-journal.html">Журнал</a>
-        <a class="btn small ghost" href="admin-otr.html">Отработки</a>
-        <a class="btn small ghost" href="admin-chat.html">Чат</a>
         <button type="button" class="icon-btn" id="refresh" aria-label="Обновить">↻</button>
       </div>
       <h1>Результаты <em>тестов</em></h1>
@@ -190,8 +216,8 @@
 
       <div class="stats">
         <div class="stat"><span>Студентов</span><b>${students}</b></div>
-        <div class="stat"><span>Отвечают сейчас</span><b>${inProgress}</b></div>
-        <div class="stat"><span>Попыток всего</span><b>${all.length}</b></div>
+        <div class="stat"><span>Не закончили попытку</span><b>${inProgress}</b></div>
+        <div class="stat"><span>Выполнений всего</span><b>${all.filter(s => s.answered >= total).length}</b></div>
       </div>
 
       <div class="row">
@@ -218,14 +244,15 @@
     }));
     app.querySelectorAll("[data-sort]").forEach(b => b.addEventListener("click", () => { sortBy = b.dataset.sort; render(); }));
     app.querySelectorAll("button.person").forEach(b => b.addEventListener("click", () => {
-      const id = Number(b.dataset.id); open = open === id ? null : id; confirmDel = null; render();
+      const k = b.dataset.key; open = open === k ? null : k; openAttempt = null; confirmDel = null; render();
     }));
+    app.querySelectorAll("[data-pick]").forEach(b => b.addEventListener("click", () => { openAttempt = Number(b.dataset.pick); confirmDel = null; render(); }));
     app.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => { confirmDel = Number(b.dataset.del); render(); }));
     app.querySelectorAll("[data-del-no]").forEach(b => b.addEventListener("click", () => { confirmDel = null; render(); }));
     app.querySelectorAll("[data-del-yes]").forEach(b => b.addEventListener("click", async () => {
       try {
         await window.quizRpc("quiz_admin_delete", { p_quiz: testId, p_code: code, p_id: Number(b.dataset.delYes) });
-        open = null; confirmDel = null; fetchData();
+        openAttempt = null; confirmDel = null; fetchData();
       } catch (e) { b.textContent = "Не удалось удалить"; }
     }));
   }

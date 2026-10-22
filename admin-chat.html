@@ -19,6 +19,7 @@
 
 <script src="tests.js"></script>
 <script src="config.js"></script>
+<script src="admin-nav.js"></script>
 <script>
 // Чат группы для преподавателя: объявления и сообщения от имени преподавателя, удаление любых сообщений.
 // Код преподавателя тот же, что в admin.html (хранится до закрытия вкладки).
@@ -35,7 +36,7 @@
 
   function login(errText) {
     app.innerHTML = `
-      <div class="topbar"><a class="icon-btn" href="admin.html" aria-label="К результатам тестов">←</a><span class="chip">Для преподавателя</span></div>
+      <div class="topbar"><span class="chip">Для преподавателя</span></div>
       <h1>Чат <em>группы</em></h1>
       <form class="card lavender login" id="login" novalidate>
         <label class="field" for="code">Код преподавателя
@@ -85,11 +86,8 @@
         <span class="note">${fmt(m.created_at)} · ${delBtn(m.id)}</span></div>`).join("");
     app.innerHTML = `
       <div class="topbar">
-        <a class="icon-btn" href="admin.html" aria-label="К результатам тестов">←</a><span class="chip">Для преподавателя</span>
+        <span class="chip">Для преподавателя</span>
         <span class="grow"></span>
-        <a class="btn small" href="admin-journal.html">Журнал</a>
-        <a class="btn small ghost" href="admin.html">Тесты</a>
-        <a class="btn small ghost" href="admin-otr.html">Отработки</a>
         <button type="button" class="icon-btn" id="refresh" aria-label="Обновить">↻</button>
       </div>
       <h1>Чат <em>группы</em></h1>
