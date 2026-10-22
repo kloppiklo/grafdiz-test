@@ -2,7 +2,7 @@
 // Сначала всегда идём в сеть, чтобы студенты видели свежие тесты;
 // кэш нужен только чтобы оболочка открывалась при плохом интернете.
 // Запросы к базе (другой домен) не трогаем.
-const CACHE = "grafdiz-v21";
+const CACHE = "grafdiz-v22";
 const SHELL = ["./", "index.html", "test.html", "theory.html", "otrabotka.html", "style.css", "tests.js", "config.js",
   "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 

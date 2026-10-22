@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
-<link rel="stylesheet" href="style.css?v=21">
+<link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
 <main class="wrap admin journal" id="app"></main>
@@ -324,16 +324,34 @@
     const sess = D.sessions.filter(x => x.month === jMonth).sort((a, b) => a.slot - b.slot);
     const chips = months.map(m => `<button type="button" class="chip ${m === jMonth ? "dark" : ""}" data-month="${m}">${monthName(m)}</button>`).join("");
     const modOpts = cur => `<option value="">модуль…</option>` + MODULE_NAMES.map((n, i) => `<option value="${i + 1}" ${cur === i + 1 ? "selected" : ""}>Модуль ${i + 1}</option>`).join("");
-    const head = sess.map((x, i) => `<th class="lesson ${x.session_date && x.session_date > D.today ? "future" : ""} ${x.session_date ? "" : "nodate"}">
-        <small>Занятие ${i + 1}</small>
-        <input type="date" class="date-in sm" data-date="${x.id}" value="${x.session_date || ""}" aria-label="Дата занятия ${i + 1}">
-        <select class="mod-in" data-mod-of="${x.id}" aria-label="Модуль занятия ${i + 1}" title="${x.module ? esc(modLabel(x.module)) : "Выберите модуль"}">${modOpts(x.module)}</select>
-        <select class="mod-in topic-in" data-topic-of="${x.id}" aria-label="Тема занятия ${i + 1}" ${x.module ? "" : "disabled"} title="${x.pair ? esc(lessonOf(x.pair).title) : "Выберите тему"}">
-          <option value="">${x.module ? "тема…" : "сначала модуль"}</option>
-          ${D.lessons.filter(l => modOfPair(l.pair) === x.module).map(l => `<option value="${l.pair}" ${x.pair === l.pair ? "selected" : ""}>${pairNo(l.pair)} · ${esc(l.title)}</option>`).join("")}
-        </select>
-        ${x.slot > 4 ? `<button type="button" class="linkbtn small-all" data-del-session="${x.id}">убрать</button>` : ""}
-      </th>`).join("");
+    // шапка занятия: три компактные плашки (дата, модуль, тема) поверх обычных полей выбора
+    const MOD_COLOR = ["yellow", "pink", "lavender", "mint", "peach", "blue"];
+    const CAL = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>';
+    const head = sess.map((x, i) => {
+      const L = x.pair ? lessonOf(x.pair) : null;
+      const topics = D.lessons.filter(l => modOfPair(l.pair) === x.module);
+      return `<th class="lesson ${x.session_date && x.session_date > D.today ? "future" : ""} ${x.session_date ? "" : "nodate"}">
+        <div class="lh"><span>Занятие ${i + 1}</span>${x.slot > 4 ? `<button type="button" class="x-btn" data-del-session="${x.id}" aria-label="Убрать занятие ${i + 1}" title="Убрать занятие">×</button>` : ""}</div>
+        <label class="pick date-pick ${x.session_date ? "" : "empty"}" title="Дата занятия">
+          <span class="pick-face">${CAL}${x.session_date ? dShort(x.session_date) : "дата"}</span>
+          <input type="date" class="pick-native" data-date="${x.id}" value="${x.session_date || ""}" aria-label="Дата занятия ${i + 1}">
+        </label>
+        <div class="pick-row">
+          <label class="pick mod-pick ${x.module ? "" : "empty"}" style="${x.module ? `background:var(--${MOD_COLOR[x.module - 1]})` : ""}" title="${x.module ? esc(modLabel(x.module)) : "Выберите модуль"}">
+            <span class="pick-face">${x.module ? "М" + x.module : "М?"}</span>
+            <select class="pick-native" data-mod-of="${x.id}" aria-label="Модуль занятия ${i + 1}">${modOpts(x.module)}</select>
+          </label>
+          <label class="pick topic-pick ${L ? "" : "empty"} ${x.module ? "" : "off"}" title="${L ? esc(pairNo(L.pair) + " · " + L.title) : x.module ? "Выберите тему" : "Сначала выберите модуль"}">
+            <span class="pick-face">${L ? pairNo(L.pair) : "тема"}</span>
+            <select class="pick-native" data-topic-of="${x.id}" aria-label="Тема занятия ${i + 1}" ${x.module ? "" : "disabled"}>
+              <option value="">тема…</option>
+              ${topics.map(l => `<option value="${l.pair}" ${x.pair === l.pair ? "selected" : ""}>${pairNo(l.pair)} · ${esc(l.title)}</option>`).join("")}
+            </select>
+          </label>
+        </div>
+        <span class="lt" title="${L ? esc(L.title) : ""}">${L ? esc(L.title) : "&nbsp;"}</span>
+      </th>`;
+    }).join("");
     const rows = S.map(s => `<tr><td class="sticky"><button type="button" class="who name-btn" data-rename="${esc(s.key)}" title="Изменить имя"><span class="avatar sm" style="background:var(--${colorOf(s.key)})">${esc((s.first[0] || "") + (s.last[0] || "")).toUpperCase()}</span>${esc(s.last)} ${esc(s.first)}<span class="pen" aria-hidden="true">✎</span></button></td>
       ${sess.map(x => {
         if (!x.session_date) return `<td class="mark"><span class="att off" title="Сначала поставьте дату">·</span></td>`;
@@ -359,6 +377,12 @@
     bindRename(el);
     const sessOf = id => D.sessions.find(x => x.id === id);
     el.querySelectorAll("[data-month]").forEach(b => b.addEventListener("click", () => { jMonth = b.dataset.month; render(); }));
+    el.querySelectorAll(".date-pick").forEach(lb => lb.addEventListener("click", e => {
+      const inp = lb.querySelector("input");
+      if (e.target === inp) return;
+      e.preventDefault();
+      try { inp.showPicker(); } catch (er) { inp.focus(); inp.click(); }
+    }));
     el.querySelectorAll("input[data-date]").forEach(inp => inp.addEventListener("change", () => {
       const x = sessOf(Number(inp.dataset.date));
       call("journal_session_set", { p_id: x.id, p_date: inp.value || null, p_module: x.module, p_pair: x.pair });

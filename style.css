@@ -659,3 +659,22 @@ table.journal-table th.lesson.nodate .date-in { outline: 2px dashed var(--peach)
 .card.rename .field input[type=text] { background: var(--white); }
 .card.rename { align-items: stretch; }
 .card.rename .row { align-items: flex-end; }
+
+/* компактная шапка занятия: плашки даты, модуля и темы */
+table.journal-table th.lesson { min-width: 104px; max-width: 120px; padding: 6px 4px 8px; }
+table.journal-table th.lesson .lt { font-size: 11px; font-weight: 400; color: var(--ink-2); min-height: 28px; margin: 4px 0 0; text-align: center; }
+.lh { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 11px; font-weight: 500; color: var(--ink-2); margin-bottom: 4px; }
+.x-btn { border: 0; background: none; color: var(--ink-2); font-size: 15px; line-height: 1; padding: 0 2px; cursor: pointer; }
+.x-btn:hover { color: var(--bad); }
+.pick { position: relative; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--cream); cursor: pointer; overflow: hidden; }
+.pick-face { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: var(--ink); padding: 5px 9px; white-space: nowrap; pointer-events: none; }
+.pick-native { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; font-size: 16px; }
+.pick.empty .pick-face { color: var(--ink-2); font-weight: 500; }
+.date-pick { width: 100%; }
+.date-pick.empty { outline: 2px dashed var(--peach); outline-offset: -2px; }
+.date-pick .pick-native { pointer-events: none; }
+.pick-row { display: flex; gap: 4px; margin-top: 4px; justify-content: center; }
+.pick-row .pick { flex: 1 1 0; min-width: 0; }
+.pick.off { opacity: .45; cursor: default; }
+.pick.off .pick-native { cursor: default; }
+.pick:focus-within { outline: 2px solid var(--ink); outline-offset: 1px; }
