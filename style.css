@@ -716,3 +716,15 @@ table.journal-table th.lesson .pick-face svg { display: block; flex: none; }
 .att-pending .icon-btn { width: 32px; height: 32px; font-size: 14px; }
 .send.busy { animation: chat-busy 1s linear infinite; }
 @keyframes chat-busy { 50% { opacity: .4; } }
+
+/* теория по модулям */
+.module-block { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 16px; }
+.module-head { border-radius: var(--r-card); padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.module-head h2 { font-size: 28px; }
+.topic { display: flex; flex-direction: column; gap: 8px; }
+.topic h3 { margin: 4px 0 0 4px; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.topic.soon { padding: 0 4px; }
+.topic.soon h3 { color: var(--ink-2); }
+.li.mat .kind { display: block; font-size: 12px; font-weight: 500; color: var(--ink-2); text-transform: none; margin-bottom: 1px; }
+a.chip { color: inherit; text-decoration: none; }
+a.chip:hover { background: var(--ink); color: var(--white); }

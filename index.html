@@ -346,18 +346,60 @@
     mountAssignments();
   }
 
+  // ---------- теория: модули → темы → материалы (презентация, тетрадь, задание, отработка, тест)
   function theoryTab() {
-    const rows = window.TESTS.map(t => t.status === "open" && t.theory ? `
-      <a class="li" href="theory.html?t=${encodeURIComponent(t.id)}"><span class="sw" style="background:var(--${t.color})"></span>
-        <div class="grow">${esc(t.title)}<small>${esc(t.module)} · презентация</small></div><span class="go">›</span></a>` + (t.extras || []).map(x => `
-      <a class="li" href="${esc(x.href)}" ${/\.pdf$/i.test(x.href) ? 'target="_blank" rel="noopener"' : ""}><span class="sw" style="background:var(--${t.color})">${/\.pdf$/i.test(x.href) ? "↓" : "✦"}</span>
-        <div class="grow">${esc(x.title)}<small>${esc(t.module)} · ${esc(x.note)}</small></div><span class="go">${/\.pdf$/i.test(x.href) ? "↗" : "›"}</span></a>`).join("") : `
-      <div class="li soonrow"><span class="sw" style="background:var(--${t.color})"></span>
-        <div class="grow">${esc(t.title)}<small>${esc(t.module)} · скоро</small></div></div>`).join("");
+    const MODS = window.MODULES || [];
+    const OTR = (window.OTRABOTKI || []).filter(o => o.status === "open");
+    const isPdf = h => /\.pdf$/i.test(h);
+    const KIND = {
+      deck: ["Презентация", "▶"], workbook: ["Рабочая тетрадь", "↓"], task: ["Задание для группы", "✦"],
+      otr: ["Отработка", "↺"], test: ["Тест", "✓"]
+    };
+    const row = (kind, title, note, href, color) => `
+      <a class="li mat" href="${esc(href)}" ${isPdf(href) ? 'target="_blank" rel="noopener"' : ""}>
+        <span class="sw" style="background:var(--${color})">${KIND[kind][1]}</span>
+        <div class="grow"><span class="kind">${KIND[kind][0]}</span>${esc(title)}${note ? `<small>${esc(note)}</small>` : ""}</div>
+        <span class="go">${isPdf(href) ? "↗" : "›"}</span></a>`;
+    const topic = t => {
+      if (t.status !== "open") return `<div class="topic soon"><h3>${esc(t.title)}</h3><p class="note">материалы появятся позже</p></div>`;
+      const items = [];
+      if (t.theory) items.push(row("deck", t.title, "слайды с занятия", "theory.html?t=" + encodeURIComponent(t.id), t.color));
+      (t.extras || []).forEach(x => items.push(row(x.kind || (isPdf(x.href) ? "workbook" : "task"), x.title, x.note, x.href, t.color)));
+      const o = OTR.find(q => q.id === t.otr);
+      if (o) items.push(row("otr", o.title, "если пропустили занятие", "otrabotka.html?m=" + encodeURIComponent(o.id), t.color));
+      items.push(row("test", t.title, t.count + " вопросов, результат увидит преподаватель", "test.html?t=" + encodeURIComponent(t.id), t.color));
+      // заголовок темы не нужен, если он повторяет название модуля
+      const head = (MODS.find(m => m.n === window.moduleOf(t)) || {}).title === t.title ? "" : `<h3>${esc(t.title)}</h3>`;
+      return `<div class="topic">${head}<div class="list">${items.join("")}</div></div>`;
+    };
+    const blocks = MODS.map(m => {
+      const topics = window.TESTS.filter(t => window.moduleOf(t) === m.n);
+      const open = topics.filter(t => t.status === "open");
+      if (!open.length) return { m, html: "" };
+      return { m, html: `
+        <section class="module-block" id="mod-${m.n}">
+          <div class="module-head" style="background:var(--${m.color})">
+            <span class="chip">Модуль ${m.n} · ${esc(m.pairs)}</span>
+            <h2>${esc(m.title)}</h2>
+          </div>
+          ${topics.map(topic).join("")}
+        </section>` };
+    });
+    const soon = blocks.filter(b => !b.html).map(b => `
+      <div class="li soonrow"><span class="sw" style="background:var(--${b.m.color})">${b.m.n}</span>
+        <div class="grow">${esc(b.m.title)}<small>Модуль ${b.m.n} · ${esc(b.m.pairs)} · материалы появятся позже</small></div></div>`).join("");
+    const jump = blocks.filter(b => b.html).map(b => `<a class="chip" href="#mod-${b.m.n}" data-jump="${b.m.n}">Модуль ${b.m.n}</a>`).join("");
     app.innerHTML = `
       <h1>Теория</h1>
-      <p class="muted">Презентации и рабочие тетради с занятий. Слайды листаются свайпом, на телефоне удобнее смотреть горизонтально.</p>
-      <div class="list">${rows}</div>`;
+      <p class="muted">Материалы курса по модулям: презентации, рабочие тетради, задания для групп, отработки и тесты. Слайды листаются свайпом, на телефоне удобнее смотреть горизонтально.</p>
+      <div class="chips">${jump}</div>
+      ${blocks.map(b => b.html).join("")}
+      ${soon ? `<h2 class="sub">Дальше по курсу</h2><div class="list">${soon}</div>` : ""}`;
+    // переход к модулю без смены вкладки в адресе
+    app.querySelectorAll("[data-jump]").forEach(a => a.addEventListener("click", e => {
+      e.preventDefault();
+      document.getElementById("mod-" + a.dataset.jump).scrollIntoView({ behavior: "smooth", block: "start" });
+    }));
   }
 
   function progressTab() {

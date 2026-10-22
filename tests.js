@@ -1,12 +1,19 @@
 // Список тестов курса. Чтобы добавить тест: файл questions/<id>.js,
 // строка здесь со status: "open" и ключ ответов в базе для этого id.
 // theory — необязательная ссылка на презентацию с теорией (папка materials/).
-// extras — дополнительные материалы для вкладки «Теория» (PDF и т. п.), открываются в новой вкладке.
+// extras — дополнительные материалы для вкладки «Теория»: kind = workbook (рабочая тетрадь), task (задание для группы).
+// otr — id отработки этой темы (см. OTRABOTKI). Модуль берётся из подписи module: «Модуль N · …».
 window.TESTS = [
   {
     id: "module1", status: "open", color: "yellow",
     title: "Визуальное мышление", module: "Модуль 1 · пары 01–04", count: 10,
-    topics: ["Введение", "Композиция", "Контраст", "Иерархия"]
+    topics: ["Введение", "Композиция", "Контраст", "Иерархия"], otr: "m1"
+  },
+  {
+    id: "grid", status: "open", color: "lavender",
+    title: "Модульная сетка", module: "Модуль 2 · сетка", count: 12,
+    topics: ["Модуль", "История", "Принципы"],
+    theory: "materials/grid.html", otr: "grid"
   },
   {
     id: "color", status: "open", color: "pink",
@@ -14,21 +21,15 @@ window.TESTS = [
     topics: ["Свет и глаз", "Цветовой круг", "Схемы", "Модели", "Психология"],
     theory: "materials/color.html",
     extras: [
-      { title: "Рабочая тетрадь «Цвет»", note: "PDF для печати, 12 страниц", href: "materials/color-workbook.pdf" },
-      { title: "Групповое задание «Цветовое агентство»", note: "работа в группах в Figma", href: "group-color.html", short: "Задание" }
-    ]
+      { kind: "workbook", title: "Рабочая тетрадь «Цвет»", note: "PDF для печати, 12 страниц", href: "materials/color-workbook.pdf" },
+      { kind: "task", title: "Цветовое агентство", note: "работа в группах в Figma", href: "group-color.html", short: "Задание" }
+    ], otr: "color"
   },
-  {
-    id: "grid", status: "open", color: "lavender",
-    title: "Модульная сетка", module: "Модуль 2 · сетка", count: 12,
-    topics: ["Модуль", "История", "Принципы"],
-    theory: "materials/grid.html"
-  },
-  { id: "module2", status: "soon", color: "pink", title: "Типографика", module: "Модуль 2 · пары 08–10" },
-  { id: "module3", status: "soon", color: "lavender", title: "Изображение и графическая система", module: "Модуль 3 · пары 11–16" },
-  { id: "module4", status: "soon", color: "mint", title: "Illustrator и векторное мышление", module: "Модуль 4 · пары 17–24" },
-  { id: "module5", status: "soon", color: "peach", title: "Плакат", module: "Модуль 5 · пары 25–28" },
-  { id: "module6", status: "soon", color: "blue", title: "Айдентика", module: "Модуль 6 · пары 29–32" }
+  { id: "module2", status: "soon", color: "pink", title: "Типографика", module: "Модуль 2 · пары 09–11" },
+  { id: "module3", status: "soon", color: "lavender", title: "Изображение и графическая система", module: "Модуль 3 · пары 12–17" },
+  { id: "module4", status: "soon", color: "mint", title: "Illustrator и векторное мышление", module: "Модуль 4 · пары 18–25" },
+  { id: "module5", status: "soon", color: "peach", title: "Плакат", module: "Модуль 5 · пары 26–29" },
+  { id: "module6", status: "soon", color: "blue", title: "Айдентика", module: "Модуль 6 · пары 30–33" }
 ];
 
 // Отработки пропущенных занятий: содержимое в otrabotki/<id>.js, страница otrabotka.html?m=<id>.
@@ -38,6 +39,17 @@ window.OTRABOTKI = [
   { id: "color", status: "open", color: "pink", title: "Колористика", module: "Модуль 2 · цвет", pairs: 4 },
   { id: "grid", status: "open", color: "lavender", title: "Модульная сетка", module: "Модуль 2 · сетка", pairs: 2 }
 ];
+
+// Модули курса — для вкладки «Теория» (материалы сгруппированы по модулям, внутри — по темам)
+window.MODULES = [
+  { n: 1, title: "Визуальное мышление", pairs: "пары 01–04", color: "yellow" },
+  { n: 2, title: "Сетка, цвет, типографика", pairs: "пары 05–11", color: "pink" },
+  { n: 3, title: "Изображение, система, проект №1", pairs: "пары 12–17", color: "lavender" },
+  { n: 4, title: "Illustrator и векторное мышление", pairs: "пары 18–25", color: "mint" },
+  { n: 5, title: "Плакат", pairs: "пары 26–29", color: "peach" },
+  { n: 6, title: "Айдентика и итоговый кейс", pairs: "пары 30–33", color: "blue" }
+];
+window.moduleOf = item => Number((String(item.module || "").match(/Модуль\s*(\d)/) || [])[1]) || 0;
 
 // Имя студента запоминается на устройстве для всех тестов
 window.Student = {
