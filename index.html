@@ -38,6 +38,9 @@
   const SOON = window.TESTS.filter(t => t.status !== "open");
   const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isDesktop = !isIOS && !/android|mobi/i.test(navigator.userAgent);
+  const isFirefox = /firefox|fxios/i.test(navigator.userAgent);
+  const isSafari = /safari/i.test(navigator.userAgent) && !/chrome|chromium|crios|edg|opr|firefox|yabrowser/i.test(navigator.userAgent);
 
   // Android/Chrome отдают системное окно установки — сохраняем его до нажатия кнопки
   let installPrompt = null;
@@ -97,7 +100,9 @@
         <div class="stepcard"><span class="n" style="background:var(--mint)">✦</span><p>Перед тестом — теория<small>презентация с занятия всегда под рукой</small></p></div>`,
       () => `
         <h1>Иконка<br><em>на экране</em></h1>
-        <p class="muted">Добавьте приложение на экран «Домой» — и тесты будут в одно касание.</p>
+        <p class="muted">${isDesktop
+          ? "Установите приложение на компьютер — оно откроется отдельным окном, а значок будет в Dock или на рабочем столе."
+          : "Добавьте приложение на экран «Домой» — и тесты будут в одно касание."}</p>
         <div class="center"><img class="appicon" src="icons/icon-192.png" alt=""></div>
         ${installBlock()}`
     ];
@@ -130,6 +135,17 @@
         <div class="r"><span class="ic">＋</span><span>Выберите <b>«На экран „Домой“»</b></span></div>
         <div class="r"><span class="ic">✓</span><span>Нажмите <b>«Добавить»</b></span></div>
       </div>`;
+    if (isDesktop && isSafari) return `
+      <div class="ios">
+        <div class="r"><span class="ic">☰</span><span>Откройте меню <b>«Файл»</b> вверху экрана</span></div>
+        <div class="r"><span class="ic">＋</span><span>Выберите <b>«Добавить в Dock»</b></span></div>
+        <div class="r"><span class="ic">✓</span><span>Нажмите <b>«Добавить»</b> — значок появится в Dock</span></div>
+      </div>`;
+    if (isDesktop && isFirefox) return `
+      <p class="note">Firefox не умеет устанавливать сайты как приложения. Откройте этот адрес в Chrome, Edge или Safari — там появится кнопка установки.</p>`;
+    if (isDesktop) return `
+      <button class="btn ghost block" id="install">Установить на компьютер</button>
+      <p class="note" id="install-note">Если кнопка не сработала: нажмите значок установки справа в адресной строке (монитор со стрелкой) или меню ⋮ → «Сохранить и поделиться» → «Установить страницу как приложение». Приложение появится в «Программах» и Launchpad (на Mac) или в «Пуске» и на рабочем столе (на Windows).</p>`;
     return `
       <button class="btn ghost block" id="install">Установить приложение</button>
       <p class="note" id="install-note">Если кнопка не сработала: меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран».</p>`;

@@ -2,9 +2,10 @@
 // Сначала всегда идём в сеть, чтобы студенты видели свежие тесты;
 // кэш нужен только чтобы оболочка открывалась при плохом интернете.
 // Запросы к базе (другой домен) не трогаем.
-const CACHE = "grafdiz-v27";
+const CACHE = "grafdiz-v28";
 const SHELL = ["./", "index.html", "test.html", "theory.html", "otrabotka.html", "style.css", "tests.js", "config.js", "chat-kit.js",
-  "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
+  "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png",
+  "icons/app-192.png", "icons/app-512.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
