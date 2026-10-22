@@ -40,7 +40,7 @@
   try { code = sessionStorage.getItem(CODE_KEY) || ""; } catch (e) {}
   let view = (location.hash || "#perf").slice(1);
   if (!VIEWS.some(v => v[0] === view)) view = "perf";
-  let D = null, openStudent = null, mergeFor = null, renameFor = null, busy = false, flash = "";
+  let D = null, openStudent = null, mergeFor = null, renameFor = null, addOpen = false, busy = false, flash = "";
   let jMonth = null;   // месяц, открытый в журнале (YYYY-MM-01)
 
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -308,6 +308,38 @@
     }));
   }
 
+  // ---------- добавить ученика вручную (если он ещё ничего не делал в приложении)
+  function addCard() {
+    if (!addOpen) return "";
+    return `<form class="card mint rename" id="add-st" novalidate>
+      <h2>Новый ученик</h2>
+      <div class="row">
+        <label class="field grow" for="as-first">Имя<input type="text" id="as-first" maxlength="60" autocomplete="off"></label>
+        <label class="field grow" for="as-last">Фамилия<input type="text" id="as-last" maxlength="60" autocomplete="off"></label>
+      </div>
+      <div class="row"><button type="submit" class="btn small">Добавить</button><button type="button" class="btn small ghost" id="as-no">Отмена</button></div>
+      <p class="note ink">Впишите так же, как ученик подпишется в приложении, — тогда его тесты и отработки сразу попадут к нему. Если подпишется иначе, объедините имена в «Успеваемости».</p>
+    </form>`;
+  }
+  function bindAdd(el) {
+    const f = el.querySelector("#add-st");
+    const open = el.querySelector("#add-open");
+    if (open) open.onclick = () => { addOpen = true; renameFor = null; render(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+    el.querySelectorAll("[data-unhide]").forEach(b => b.addEventListener("click", () => call("journal_hide", { p_key: b.dataset.unhide, p_hidden: false })));
+    if (!f) return;
+    el.querySelector("#as-no").onclick = () => { addOpen = false; render(); };
+    f.addEventListener("submit", e => {
+      e.preventDefault();
+      const first = el.querySelector("#as-first").value.trim(), last = el.querySelector("#as-last").value.trim();
+      if (!first || !last) { flash = "Впишите и имя, и фамилию."; render(); return; }
+      addOpen = false;
+      call("journal_add_student", { p_first_name: first, p_last_name: last });
+    });
+    el.querySelector("#as-first").focus();
+  }
+  // скрытые ученики: ключ «фамилия имя» в нижнем регистре — показываем его с заглавных
+  const hiddenName = k => k.split(" ").map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(" ");
+
   // ---------- журнал: месяц → занятия (дата + модуль) → отметки учеников
   const ST = {
     present: ["was", "✓", "был(а)"],
@@ -362,7 +394,7 @@
     const totals = sess.map(x => `<td class="mark total">${x.session_date ? S.filter(s => s.marks[x.id] === "present").length : ""}</td>`).join("");
     const allBtns = sess.map(x => `<td class="mark">${x.session_date && S.length ? `<button type="button" class="linkbtn small-all" data-all="${x.id}">все были</button>` : ""}</td>`).join("");
     el.innerHTML = `
-      ${renameCard()}
+      ${renameCard()}${addCard()}
       <div class="chips mod-chips" role="tablist" aria-label="Месяц">${chips}</div>
       <p class="muted">Для каждого занятия поставьте дату, выберите модуль и тему. Чтобы исправить имя ученика, нажмите на него. Потом нажимайте на клетки: <b>✓ был</b> → <b>Н не был</b> → пусто. Отмеченный «не был» получает отработку по теме занятия и видит её у себя на главной. Отработка закрывается, когда вы засчитываете сданную работу в «Отработках».</p>
       <div class="table-scroll"><table class="journal-table">
@@ -371,10 +403,13 @@
       </table></div>
       ${S.length ? "" : `<p class="note">Учеников пока нет — они появятся автоматически, когда начнут проходить тесты или откроют теорию. Даты и модули можно поставить уже сейчас.</p>`}
       <div class="row">
+        <button type="button" class="btn small" id="add-open">+ Добавить ученика</button>
         <button type="button" class="btn small ghost" id="add-session">+ Ещё занятие в ${monthName(jMonth).toLowerCase().replace(/ь$/, "е").replace(/й$/, "е")}</button>
         <span class="legend"><i class="att was">✓</i> был(а)</span><span class="legend"><i class="att miss">Н</i> не был(а) — отработка</span>
-      </div>`;
+      </div>
+      ${D.hidden.length ? `<p class="note">Скрыты из журнала: ${D.hidden.map(k => `${esc(hiddenName(k))} <button type="button" class="linkbtn inline" data-unhide="${esc(k)}">вернуть</button>`).join(" · ")}</p>` : ""}`;
     bindRename(el);
+    bindAdd(el);
     const sessOf = id => D.sessions.find(x => x.id === id);
     el.querySelectorAll("[data-month]").forEach(b => b.addEventListener("click", () => { jMonth = b.dataset.month; render(); }));
     el.querySelectorAll(".date-pick").forEach(lb => lb.addEventListener("click", e => {
