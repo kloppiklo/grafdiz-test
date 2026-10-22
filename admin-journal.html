@@ -135,8 +135,8 @@
   };
   const openOtr = s => s.assigned.filter(a => a.status !== "ok");
   const lessonOf = pair => D.lessons.find(l => l.pair === pair);
-  // в каком модуле пара программы
-  const modOfPair = p => p <= 4 ? 1 : p <= 10 ? 2 : p <= 16 ? 3 : p <= 24 ? 4 : p <= 28 ? 5 : 6;
+  // в каком модуле тема программы (номер модуля приходит из базы)
+  const modOfPair = p => (lessonOf(p) || {}).module;
   const modLabel = n => n ? `Модуль ${n} · ${MODULE_NAMES[n - 1]}` : "модуль не указан";
 
   // ---------- общий каркас
