@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f0e2">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="robots" content="noindex">
+<title>Отчёты родителям</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="style.css?v=23">
+<style>
+  .rep { display: grid; gap: 16px; }
+  @media (min-width: 900px) { .rep { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } .rep .out { position: sticky; top: 16px; } }
+  .rep select { font: inherit; font-size: 16px; color: var(--ink); background: var(--white); border: 0; border-radius: 999px; padding: 12px 16px; width: 100%; }
+  .rep .card textarea, .rep .card input[type=text] { background: var(--white); font-size: 16px; }
+  .rep .seg { display: flex; background: var(--white); flex-wrap: wrap; border-radius: 22px; align-self: flex-start; }
+  .rep .seg-b.on { background: var(--ink); color: var(--white); }
+  .rep .check { display: flex; gap: 10px; align-items: center; font-size: 15px; color: var(--ink); cursor: pointer; }
+  .rep .check input { width: 20px; height: 20px; accent-color: var(--ink); flex: none; }
+  .rep .out textarea { min-height: 420px; font-size: 15px; line-height: 1.45; }
+  .rep .ok-msg { color: var(--good); font-size: 14px; }
+</style>
+</head>
+<body>
+<main class="wrap admin" id="app"></main>
+
+<script src="config.js"></script>
+<script src="reports-data.js"></script>
+<script src="admin-nav.js"></script>
+<script>
+// Отчёт родителям о прошедшем занятии. Тема и дата берутся из журнала (journal_get),
+// содержание — из reports-data.js по теме программы. Текст можно поправить и скопировать в чат.
+(function () {
+  const app = document.getElementById("app");
+  const CODE_KEY = "quiz_admin_code";
+  const R = window.REPORTS;
+
+  let code = "";
+  try { code = sessionStorage.getItem(CODE_KEY) || ""; } catch (e) {}
+  let D = null;
+  // состояние формы
+  let S = { pick: "", when: "today", greet: "day", learned: true, next: true, hw: "", format: "", extra: "" };
+
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const dShort = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" }).replace(".", "") : "";
+  const pairNo = n => String(n).padStart(2, "0");
+  const dayDiff = (a, b) => Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 864e5);
+
+  function login(errText) {
+    app.innerHTML = `
+      <div class="topbar"><span class="chip">Для преподавателя</span></div>
+      <h1>Отчёты <em>родителям</em></h1>
+      <form class="card lavender login" id="login" novalidate>
+        <label class="field" for="code">Код преподавателя
+          <input type="password" id="code" autocomplete="current-password" required>
+        </label>
+        <p class="error" ${errText ? "" : "hidden"}>${esc(errText || "")}</p>
+        <button class="btn block" type="submit">Открыть <span class="arr">→</span></button>
+      </form>`;
+    document.getElementById("login").addEventListener("submit", e => {
+      e.preventDefault();
+      code = document.getElementById("code").value.trim();
+      load();
+    });
+  }
+
+  async function load() {
+    try {
+      D = await window.quizRpc("journal_get", { p_code: code });
+      try { sessionStorage.setItem(CODE_KEY, code); } catch (e) {}
+      start();
+    } catch (e) {
+      try { sessionStorage.removeItem(CODE_KEY); } catch (e2) {}
+      login(e && /code/i.test(e.message) ? "Код не подошёл. Проверьте его и попробуйте ещё раз." : "Не удалось загрузить журнал. Проверьте интернет и попробуйте ещё раз.");
+    }
+  }
+
+  // занятия из журнала, у которых выбрана тема; последнее прошедшее — по умолчанию
+  let SESS = [];
+  function start() {
+    SESS = D.sessions.filter(x => x.pair && x.session_date).sort((a, b) => a.session_date.localeCompare(b.session_date));
+    const past = SESS.filter(x => x.session_date <= D.today);
+    const last = past[past.length - 1] || SESS[0];
+    const h = new Date().getHours();
+    S.greet = h < 12 ? "morning" : h < 18 ? "day" : "evening";
+    choose(last ? "s" + last.id : "p1");
+  }
+
+  const lessonOf = pair => D.lessons.find(l => l.pair === pair) || { pair, title: "" };
+  function picked() {
+    if (S.pick[0] === "s") {
+      const s = SESS.find(x => "s" + x.id === S.pick);
+      return { pair: s.pair, date: s.session_date };
+    }
+    return { pair: +S.pick.slice(1), date: null };
+  }
+  // при смене занятия подставляем домашку и «когда» заново
+  function choose(v) {
+    S.pick = v;
+    const p = picked(), r = R[p.pair] || {};
+    S.hw = r.hw || "";
+    S.format = r.format || "";
+    if (p.date) {
+      const d = dayDiff(p.date, D.today);
+      S.when = d <= 0 ? "today" : d === 1 ? "yesterday" : "last";
+    }
+    render();
+  }
+
+  function nextPair(p) {
+    if (p.date) {
+      const n = SESS.find(x => x.session_date > p.date);
+      if (n) return n.pair;
+    }
+    return R[p.pair + 1] ? p.pair + 1 : null;
+  }
+
+  const GREET = { morning: "Уважаемые родители, доброе утро!", day: "Добрый день, уважаемые родители!", evening: "Добрый вечер, уважаемые родители!" };
+  const WHEN = { today: "Сегодня на занятии", yesterday: "На вчерашнем занятии", last: "На прошлом занятии" };
+  function compose() {
+    const p = picked(), r = R[p.pair];
+    if (!r) return "";
+    const out = [GREET[S.greet], `${WHEN[S.when]} мы с ребятами ${r.about}.`];
+    if (r.theory) out.push(r.theory);
+    if (S.learned && r.learned && r.learned.length) out.push("Также научились:\n" + r.learned.map(x => "- " + x).join("\n"));
+    if (r.practice) out.push(`На практике ребята ${r.practice}.`);
+    if (S.extra.trim()) out.push(S.extra.trim());
+    const np = S.next ? nextPair(p) : null;
+    if (np && R[np]) out.push(`На следующем занятии мы ${R[np].next}.`);
+    if (S.hw.trim()) {
+      let hw = "Домашнее задание: " + S.hw.trim().replace(/\.$/, "") + ".";
+      if (S.format.trim()) hw += "\nФормат сдачи — " + S.format.trim().replace(/\.$/, "") + ".";
+      out.push(hw);
+    }
+    return out.join("\n\n");
+  }
+
+  function seg(name, opts) {
+    return `<div class="seg" role="group">${opts.map(([v, l]) => `<button type="button" class="seg-b ${S[name] === v ? "on" : ""}" data-seg="${name}" data-v="${v}" aria-pressed="${S[name] === v}">${l}</button>`).join("")}</div>`;
+  }
+
+  function render() {
+    const p = picked();
+    const sessOpts = SESS.slice().reverse().map(x => {
+      const l = lessonOf(x.pair);
+      return `<option value="s${x.id}" ${S.pick === "s" + x.id ? "selected" : ""}>${dShort(x.session_date)}${x.session_date > D.today ? " (впереди)" : ""} · ${pairNo(x.pair)}. ${esc(l.title)}</option>`;
+    }).join("");
+    const allOpts = D.lessons.slice().sort((a, b) => a.pair - b.pair).map(l => `<option value="p${l.pair}" ${S.pick === "p" + l.pair ? "selected" : ""}>${pairNo(l.pair)}. ${esc(l.title)}</option>`).join("");
+    app.innerHTML = `
+      <div class="topbar"><span class="chip">Для преподавателя</span></div>
+      <h1>Отчёт <em>родителям</em></h1>
+      <p class="muted">Выберите занятие — текст соберётся из теории по теме. Его можно поправить и отправить в чат вместе с фотографиями.</p>
+      <div class="rep">
+        <div class="fields">
+          <section class="card yellow">
+            <h3>Занятие</h3>
+            <label class="field" for="pick">Из журнала или любая тема программы
+              <select id="pick">
+                ${sessOpts ? `<optgroup label="Занятия из журнала">${sessOpts}</optgroup>` : ""}
+                <optgroup label="Все темы программы">${allOpts}</optgroup>
+              </select>
+            </label>
+            <div class="field">Когда было занятие${seg("when", [["today", "Сегодня"], ["yesterday", "Вчера"], ["last", "Раньше"]])}</div>
+            <div class="field">Приветствие${seg("greet", [["morning", "Утро"], ["day", "День"], ["evening", "Вечер"]])}</div>
+          </section>
+          <section class="card lavender">
+            <h3>Что включить</h3>
+            <label class="check"><input type="checkbox" id="c-learned" ${S.learned ? "checked" : ""}>Список «Также научились»</label>
+            <label class="check"><input type="checkbox" id="c-next" ${S.next ? "checked" : ""}>Что будет на следующем занятии</label>
+            <label class="field" for="extra">Дополнительно — просьба к родителям, новости группы
+              <textarea id="extra" placeholder="Например: прошу проследить, чтобы ребята установили Figma на домашний компьютер.">${esc(S.extra)}</textarea>
+            </label>
+          </section>
+          <section class="card mint">
+            <h3>Домашнее задание</h3>
+            <label class="field" for="hw">Задание (пусто — не писать)
+              <textarea id="hw">${esc(S.hw)}</textarea>
+            </label>
+            <label class="field" for="format">Формат сдачи
+              <input type="text" id="format" value="${esc(S.format)}">
+            </label>
+          </section>
+        </div>
+        <section class="card out">
+          <h3>Готовый текст</h3>
+          <textarea id="out" aria-label="Текст отчёта">${esc(compose())}</textarea>
+          <p class="note">Можно править прямо здесь. Если после этого изменить поля слева, текст соберётся заново.</p>
+          <div class="row">
+            <button class="btn" id="copy" type="button">Скопировать</button>
+            ${navigator.share ? `<button class="btn ghost" id="share" type="button">Поделиться</button>` : ""}
+            <span class="ok-msg" id="okmsg" hidden>Скопировано</span>
+          </div>
+        </section>
+      </div>`;
+    bind();
+  }
+
+  const refresh = () => { document.getElementById("out").value = compose(); };
+  function bind() {
+    document.getElementById("pick").addEventListener("change", e => choose(e.target.value));
+    app.querySelectorAll("[data-seg]").forEach(b => b.addEventListener("click", () => { S[b.dataset.seg] = b.dataset.v; render(); }));
+    document.getElementById("c-learned").addEventListener("change", e => { S.learned = e.target.checked; refresh(); });
+    document.getElementById("c-next").addEventListener("change", e => { S.next = e.target.checked; refresh(); });
+    [["extra", "extra"], ["hw", "hw"], ["format", "format"]].forEach(([id, k]) =>
+      document.getElementById(id).addEventListener("input", e => { S[k] = e.target.value; refresh(); }));
+    const ok = document.getElementById("okmsg");
+    document.getElementById("copy").addEventListener("click", async () => {
+      const t = document.getElementById("out");
+      try { await navigator.clipboard.writeText(t.value); }
+      catch (e) { t.select(); document.execCommand("copy"); }
+      ok.hidden = false; setTimeout(() => { ok.hidden = true; }, 2000);
+    });
+    const sh = document.getElementById("share");
+    if (sh) sh.addEventListener("click", () => navigator.share({ text: document.getElementById("out").value }).catch(() => {}));
+  }
+
+  if (code) load(); else login();
+})();
+</script>
+</body>
+</html>
