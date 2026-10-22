@@ -228,12 +228,14 @@
   function theoryTab() {
     const rows = window.TESTS.map(t => t.status === "open" && t.theory ? `
       <a class="li" href="theory.html?t=${encodeURIComponent(t.id)}"><span class="sw" style="background:var(--${t.color})"></span>
-        <div class="grow">${esc(t.title)}<small>${esc(t.module)} · презентация</small></div><span class="go">›</span></a>` : `
+        <div class="grow">${esc(t.title)}<small>${esc(t.module)} · презентация</small></div><span class="go">›</span></a>` + (t.extras || []).map(x => `
+      <a class="li" href="${esc(x.href)}" target="_blank" rel="noopener"><span class="sw" style="background:var(--${t.color})">↓</span>
+        <div class="grow">${esc(x.title)}<small>${esc(t.module)} · ${esc(x.note)}</small></div><span class="go">↗</span></a>`).join("") : `
       <div class="li soonrow"><span class="sw" style="background:var(--${t.color})"></span>
         <div class="grow">${esc(t.title)}<small>${esc(t.module)} · скоро</small></div></div>`).join("");
     app.innerHTML = `
       <h1>Теория</h1>
-      <p class="muted">Презентации с занятий. Слайды листаются свайпом, на телефоне удобнее смотреть горизонтально.</p>
+      <p class="muted">Презентации и рабочие тетради с занятий. Слайды листаются свайпом, на телефоне удобнее смотреть горизонтально.</p>
       <div class="list">${rows}</div>`;
   }
 
