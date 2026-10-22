@@ -651,3 +651,11 @@ table.journal-table th.lesson.nodate .date-in { outline: 2px dashed var(--peach)
 .rename { align-items: flex-end; }
 .rename .field { flex: 1 1 160px; min-width: 0; }
 .rename input[type=text] { background: var(--white); }
+.name-btn { background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 0; text-align: left; }
+.name-btn .pen, .pen-btn { color: var(--ink-2); font-size: 13px; opacity: 0; transition: opacity .15s; }
+.name-btn:hover .pen, .name-btn:focus-visible .pen, tr.srow:hover .pen-btn, .pen-btn:focus-visible { opacity: 1; }
+@media (hover: none) { .name-btn .pen, .pen-btn { opacity: .6; } }
+.pen-btn { background: none; border: 0; cursor: pointer; padding: 4px 6px; margin-left: 2px; }
+.card.rename .field input[type=text] { background: var(--white); }
+.card.rename { align-items: stretch; }
+.card.rename .row { align-items: flex-end; }

@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
 <main class="wrap admin journal" id="app"></main>
@@ -160,7 +160,7 @@
   }
   window.addEventListener("hashchange", () => {
     const v = location.hash.slice(1);
-    if (VIEWS.some(x => x[0] === v)) { view = v; openStudent = null; mergeFor = null; if (D) { render(); window.scrollTo(0, 0); } }
+    if (VIEWS.some(x => x[0] === v)) { view = v; openStudent = null; mergeFor = null; renameFor = null; if (D) { render(); window.scrollTo(0, 0); } }
   });
 
   // ---------- успеваемость
@@ -183,14 +183,14 @@
       }).join("");
       const ow = openOtr(s);
       return `<tr class="srow ${openStudent === s.key ? "on" : ""}" data-key="${esc(s.key)}">
-        <td><span class="who"><span class="avatar sm" style="background:var(--${colorOf(s.key)})">${esc((s.first[0] || "") + (s.last[0] || "")).toUpperCase()}</span>${esc(s.last)} ${esc(s.first)}</span></td>
+        <td><span class="who"><span class="avatar sm" style="background:var(--${colorOf(s.key)})">${esc((s.first[0] || "") + (s.last[0] || "")).toUpperCase()}</span>${esc(s.last)} ${esc(s.first)}<button type="button" class="pen-btn" data-rename="${esc(s.key)}" aria-label="Изменить имя ${esc(s.first + " " + s.last)}" title="Изменить имя">✎</button></span></td>
         ${cells}
         <td class="num">${PAST.length ? `${s.present}/${PAST.length}` : "—"}</td>
         <td class="num">${ow.length ? `<span class="pill bad">${ow.length}</span>` : (s.assigned.length ? `<span class="pill good">✓</span>` : `<span class="muted">—</span>`)}</td>
       </tr>`;
     }).join("");
 
-    el.innerHTML = `
+    el.innerHTML = renameCard() + `
       <div class="tiles">
         <div class="tile" style="background:var(--mint)"><b>${n}</b><span>учеников</span></div>
         <div class="tile" style="background:var(--lavender)"><b>${avg === null ? "—" : avg + "%"}</b><span>средний результат тестов</span></div>
@@ -207,6 +207,7 @@
       openStudent = openStudent === tr.dataset.key ? null : tr.dataset.key; mergeFor = null; render();
       const d = document.getElementById("detail"); if (d && openStudent) d.scrollIntoView({ behavior: "smooth", block: "start" });
     }));
+    bindRename(el);
     if (openStudent) renderDetail(document.getElementById("detail"));
   }
 
@@ -274,6 +275,39 @@
     const h = el.querySelector("#hide"); if (h) h.onclick = () => { openStudent = null; call("journal_hide", { p_key: s.key, p_hidden: true }); };
   }
 
+  // ---------- переименование ученика (журнал): карточка над таблицей
+  function renameCard() {
+    const s = S.find(x => x.key === renameFor);
+    if (!s) return "";
+    return `<form class="card yellow rename" id="rename-j" novalidate>
+      <h2>Имя ученика</h2>
+      <div class="row">
+        <label class="field grow" for="rj-first">Имя<input type="text" id="rj-first" maxlength="60" value="${esc(s.first)}"></label>
+        <label class="field grow" for="rj-last">Фамилия<input type="text" id="rj-last" maxlength="60" value="${esc(s.last)}"></label>
+      </div>
+      <div class="row"><button type="submit" class="btn small">Сохранить</button><button type="button" class="btn small ghost" id="rj-no">Отмена</button></div>
+      <p class="note ink">Новое имя увидите вы — в журнале, тестах и отработках. У ученика в приложении останется имя, которое он ввёл сам.</p>
+    </form>`;
+  }
+  function bindRename(el) {
+    const f = el.querySelector("#rename-j");
+    if (f) {
+      el.querySelector("#rj-no").onclick = () => { renameFor = null; render(); };
+      f.addEventListener("submit", e => {
+        e.preventDefault();
+        const first = el.querySelector("#rj-first").value.trim(), last = el.querySelector("#rj-last").value.trim();
+        if (!first || !last) { flash = "Впишите и имя, и фамилию."; render(); return; }
+        const key = renameFor; renameFor = null;
+        call("journal_rename", { p_key: key, p_first_name: first, p_last_name: last });
+      });
+      el.querySelector("#rj-first").focus();
+    }
+    el.querySelectorAll("[data-rename]").forEach(b => b.addEventListener("click", e => {
+      e.stopPropagation();
+      renameFor = b.dataset.rename; render(); window.scrollTo({ top: 0, behavior: "smooth" });
+    }));
+  }
+
   // ---------- журнал: месяц → занятия (дата + модуль) → отметки учеников
   const ST = {
     present: ["was", "✓", "был(а)"],
@@ -300,7 +334,7 @@
         </select>
         ${x.slot > 4 ? `<button type="button" class="linkbtn small-all" data-del-session="${x.id}">убрать</button>` : ""}
       </th>`).join("");
-    const rows = S.map(s => `<tr><td class="sticky"><span class="who"><span class="avatar sm" style="background:var(--${colorOf(s.key)})">${esc((s.first[0] || "") + (s.last[0] || "")).toUpperCase()}</span>${esc(s.last)} ${esc(s.first)}</span></td>
+    const rows = S.map(s => `<tr><td class="sticky"><button type="button" class="who name-btn" data-rename="${esc(s.key)}" title="Изменить имя"><span class="avatar sm" style="background:var(--${colorOf(s.key)})">${esc((s.first[0] || "") + (s.last[0] || "")).toUpperCase()}</span>${esc(s.last)} ${esc(s.first)}<span class="pen" aria-hidden="true">✎</span></button></td>
       ${sess.map(x => {
         if (!x.session_date) return `<td class="mark"><span class="att off" title="Сначала поставьте дату">·</span></td>`;
         const v = s.marks[x.id];
@@ -310,8 +344,9 @@
     const totals = sess.map(x => `<td class="mark total">${x.session_date ? S.filter(s => s.marks[x.id] === "present").length : ""}</td>`).join("");
     const allBtns = sess.map(x => `<td class="mark">${x.session_date && S.length ? `<button type="button" class="linkbtn small-all" data-all="${x.id}">все были</button>` : ""}</td>`).join("");
     el.innerHTML = `
+      ${renameCard()}
       <div class="chips mod-chips" role="tablist" aria-label="Месяц">${chips}</div>
-      <p class="muted">Для каждого занятия поставьте дату, выберите модуль и тему. Потом нажимайте на клетки: <b>✓ был</b> → <b>Н не был</b> → пусто. Отмеченный «не был» получает отработку по теме занятия и видит её у себя на главной. Отработка закрывается, когда вы засчитываете сданную работу в «Отработках».</p>
+      <p class="muted">Для каждого занятия поставьте дату, выберите модуль и тему. Чтобы исправить имя ученика, нажмите на него. Потом нажимайте на клетки: <b>✓ был</b> → <b>Н не был</b> → пусто. Отмеченный «не был» получает отработку по теме занятия и видит её у себя на главной. Отработка закрывается, когда вы засчитываете сданную работу в «Отработках».</p>
       <div class="table-scroll"><table class="journal-table">
         <thead><tr><th class="sticky">${monthName(jMonth)}</th>${head}</tr></thead>
         ${S.length ? `<tbody>${rows}<tr><td class="sticky note">Присутствовали</td>${totals}</tr><tr><td class="sticky note">Отметить всех</td>${allBtns}</tr></tbody>` : ""}
@@ -321,6 +356,7 @@
         <button type="button" class="btn small ghost" id="add-session">+ Ещё занятие в ${monthName(jMonth).toLowerCase().replace(/ь$/, "е").replace(/й$/, "е")}</button>
         <span class="legend"><i class="att was">✓</i> был(а)</span><span class="legend"><i class="att miss">Н</i> не был(а) — отработка</span>
       </div>`;
+    bindRename(el);
     const sessOf = id => D.sessions.find(x => x.id === id);
     el.querySelectorAll("[data-month]").forEach(b => b.addEventListener("click", () => { jMonth = b.dataset.month; render(); }));
     el.querySelectorAll("input[data-date]").forEach(inp => inp.addEventListener("change", () => {
