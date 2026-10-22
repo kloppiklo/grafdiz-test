@@ -392,9 +392,25 @@
         <button class="li" id="p-help"><span class="sw" style="background:var(--cream)">?</span>
           <div class="grow">Как это работает<small>показать знакомство ещё раз</small></div><span class="go">›</span></button>
       </div>
+      <div id="p-logout-box">
+        <button class="btn ghost block logout-btn" id="p-logout">Выйти из аккаунта</button>
+      </div>
       <div class="grow-sp"></div>
       <a class="btn ghost block admin-link" href="admin.html">Вход для преподавателя</a>`;
     document.getElementById("p-name").onclick = () => register(true);
+    document.getElementById("p-logout").onclick = () => {
+      document.getElementById("p-logout-box").innerHTML = `
+        <section class="card coral logout-confirm">
+          <h2>Выйти из аккаунта?</h2>
+          <p>С этого устройства сотрутся имя, фото, ваш прогресс по тестам и статусы отработок. Результаты, которые вы уже отправили, останутся у преподавателя.</p>
+          <div class="row">
+            <button class="btn grow" id="p-logout-yes">Выйти</button>
+            <button class="btn ghost grow" id="p-logout-no">Отмена</button>
+          </div>
+        </section>`;
+      document.getElementById("p-logout-yes").onclick = logout;
+      document.getElementById("p-logout-no").onclick = () => profileTab();
+    };
     document.getElementById("p-file").onchange = async e => {
       const err = document.getElementById("p-photo-err");
       try {
@@ -408,6 +424,19 @@
     document.getElementById("p-help").onclick = () => { slide = 0; welcome(true); };
     const pi = document.getElementById("p-install");
     if (pi) pi.onclick = () => { slide = 2; welcome(true); };
+  }
+
+  // Выход: стираем всё, что приложение хранит на устройстве о студенте (имя, фото, прогресс,
+  // токены отработок и своих сообщений в чате), и показываем знакомство заново.
+  function logout() {
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith("quiz_") || k.startsWith("otr_"))
+        .forEach(k => localStorage.removeItem(k));
+    } catch (e) {}
+    history.replaceState(null, "", location.pathname + location.search);
+    slide = 0;
+    welcome(false);
   }
 
   // ---------- чат группы: объявления преподавателя сверху, общая лента ниже.

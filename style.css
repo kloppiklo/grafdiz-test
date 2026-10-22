@@ -681,3 +681,7 @@ table.journal-table th.lesson .lt { font-size: 11px; font-weight: 400; color: va
 /* плашки в шапке журнала: иконка и текст на одной линии */
 table.journal-table th.lesson .pick-face { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; line-height: 1; }
 table.journal-table th.lesson .pick-face svg { display: block; flex: none; }
+
+/* выход из аккаунта в профиле */
+.logout-btn { color: var(--bad); }
+.logout-confirm p { margin: 0; }
