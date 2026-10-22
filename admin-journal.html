@@ -39,6 +39,7 @@
   if (!VIEWS.some(v => v[0] === view)) view = "perf";
   let D = null, openStudent = null, mergeFor = null, busy = false, flash = "";
   let markDate = null, markPair = null;   // карточка «Отметить занятие»
+  let jModule = null;                     // модуль, открытый в журнале
 
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const dShort = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" }).replace(".", "") : "";
@@ -248,15 +249,24 @@
 
   // ---------- журнал посещений: ученики × занятия с датами
   // ---------- отметить занятие: дата → тема → кто был
+  const MODULES = () => [...new Set(D.lessons.map(l => l.module))];
+  // модуль по умолчанию: где стоит сегодняшнее или последнее прошедшее занятие, иначе первый с пустыми датами
+  function defaultModule() {
+    const past = D.lessons.filter(l => l.lesson_date && l.lesson_date <= D.today).sort((a, b) => b.lesson_date.localeCompare(a.lesson_date))[0];
+    if (past) return past.module;
+    return (D.lessons.find(l => !l.lesson_date) || D.lessons[0]).module;
+  }
   function markCard() {
     if (!markDate) markDate = D.today;
-    const onDate = D.lessons.find(l => l.lesson_date === markDate);
-    if (!markPair) {   // по умолчанию: тема, у которой уже стоит эта дата, иначе первая тема без даты
-      markPair = onDate ? onDate.pair : (D.lessons.find(l => !l.lesson_date) || D.lessons[0]).pair;
+    const inMod = D.lessons.filter(l => l.module === jModule);
+    if (!markPair || !inMod.some(l => l.pair === markPair)) {
+      // по умолчанию: тема модуля с этой датой, иначе первая тема модуля без даты
+      const onDate = inMod.find(l => l.lesson_date === markDate);
+      markPair = (onDate || inMod.find(l => !l.lesson_date) || inMod[0]).pair;
     }
     const L = D.lessons.find(l => l.pair === markPair);
     const bound = L.lesson_date === markDate;
-    const opts = D.lessons.map(l => `<option value="${l.pair}" ${l.pair === markPair ? "selected" : ""}>${pairNo(l.pair)} · ${esc(l.title)}${l.lesson_date ? " — " + dShort(l.lesson_date) : ""}</option>`).join("");
+    const opts = inMod.map(l => `<option value="${l.pair}" ${l.pair === markPair ? "selected" : ""}>${pairNo(l.pair)} · ${esc(l.title)}${l.lesson_date ? " — " + dShort(l.lesson_date) : ""}</option>`).join("");
     const bindBtn = bound ? `<span class="pill good">тема привязана к дате</span>`
       : `<button type="button" class="btn small" id="m-bind">${L.lesson_date ? "Перенести тему на " + dShort(markDate) : "Привязать тему к " + dShort(markDate)}</button>
          ${L.lesson_date ? `<span class="note ink">Сейчас у этой темы стоит ${dLong(L.lesson_date)}.</span>` : ""}`;
@@ -275,7 +285,7 @@
       <h2>Отметить занятие</h2>
       <div class="mark-fields">
         <label class="field" for="m-date">Дата<input type="date" id="m-date" class="date-in" value="${markDate}"></label>
-        <label class="field grow" for="m-pair">Тема (пара программы)<select id="m-pair">${opts}</select></label>
+        <label class="field grow" for="m-pair">Тема модуля<select id="m-pair">${opts}</select></label>
       </div>
       <div class="row">${bindBtn}</div>
       ${S.length ? `<div class="row"><h3 class="grow">Кто был${bound ? ` · ${cnt} из ${S.length}` : ""}</h3>${bound ? `<button type="button" class="btn small ghost" id="m-all">Все были</button>` : ""}</div>
@@ -308,30 +318,38 @@
   }
 
   function renderJournal(el) {
-    const dated = D.lessons.filter(l => l.lesson_date).sort((a, b) => a.lesson_date.localeCompare(b.lesson_date) || a.pair - b.pair);
-    if (!dated.length) {
-      el.innerHTML = markCard() + `<p class="note">Когда у занятий появятся даты, ниже будет общая таблица посещений. Даты всех пар можно поставить и разом — в «Расписании».</p>`;
-      bindMark(el);
-      return;
-    }
-    const head = dated.map(l => `<th class="lesson ${l.lesson_date > D.today ? "future" : ""}" title="${esc(l.title)}"><span>${dShort(l.lesson_date)}</span><small>${pairNo(l.pair)}</small></th>`).join("");
+    if (!jModule) jModule = defaultModule();
+    const lessons = D.lessons.filter(l => l.module === jModule);
+    const chips = MODULES().map(m => `<button type="button" class="chip ${m === jModule ? "dark" : ""}" data-mod="${esc(m)}">${esc(m)}</button>`).join("");
+    const head = lessons.map(l => `<th class="lesson ${l.lesson_date && l.lesson_date > D.today ? "future" : ""} ${l.lesson_date ? "" : "nodate"}">
+        <small>${pairNo(l.pair)}</small><span class="lt" title="${esc(l.title)}">${esc(l.title)}</span>
+        <input type="date" class="date-in sm" data-date="${l.pair}" value="${l.lesson_date || ""}" aria-label="Дата пары ${pairNo(l.pair)} «${esc(l.title)}»">
+      </th>`).join("");
     const rows = S.map(s => `<tr><td class="sticky"><span class="who"><span class="avatar sm" style="background:var(--${colorOf(s.key)})">${esc((s.first[0] || "") + (s.last[0] || "")).toUpperCase()}</span>${esc(s.last)} ${esc(s.first)}</span></td>
-      ${dated.map(l => {
+      ${lessons.map(l => {
+        if (!l.lesson_date) return `<td class="mark"><span class="att off" title="Сначала поставьте дату">·</span></td>`;
         const v = s.marks[l.pair], past = l.lesson_date <= D.today;
         const st = v === true ? ["was", "✓", "был(а)"] : v === false ? ["miss", "Н", "не был(а) — отработка"] : past ? ["owe", "О", "не отмечен — назначена отработка"] : ["none", "", "не отмечен"];
         return `<td class="mark"><button type="button" class="att ${st[0]}" data-pair="${l.pair}" data-key="${esc(s.key)}" title="${esc(st[2])}" aria-label="${esc(s.last + " " + s.first + ", пара " + pairNo(l.pair) + ": " + st[2])}">${st[1]}</button></td>`;
       }).join("")}</tr>`).join("");
-    const totals = dated.map(l => `<td class="mark total">${S.filter(s => s.marks[l.pair] === true).length}</td>`).join("");
-    el.innerHTML = markCard() + `
-      <h2 class="sub">Все занятия</h2>
-      <p class="muted">Нажмите на клетку: <b>✓ был</b> → <b>Н не был</b> → пусто. Если на прошедшем занятии ученик не отмечен как присутствующий, ему автоматически назначается отработка этой темы — клетка покажет <b>О</b>, а ученик увидит отработку у себя на главной.</p>
-      <div class="table-scroll"><table class="journal-table">
+    const totals = lessons.map(l => `<td class="mark total">${l.lesson_date ? S.filter(s => s.marks[l.pair] === true).length : ""}</td>`).join("");
+    const allBtns = lessons.map(l => `<td class="mark">${l.lesson_date && S.length ? `<button type="button" class="linkbtn small-all" data-all="${l.pair}" title="Отметить всех присутствующими">все</button>` : ""}</td>`).join("");
+    el.innerHTML = `
+      <div class="chips mod-chips" role="tablist" aria-label="Модуль">${chips}</div>
+      ${markCard()}
+      <h2 class="sub">${esc(jModule)}</h2>
+      <p class="muted">Поставьте дату в заголовке столбца — так пара привязывается к дню занятия. Потом нажимайте на клетки: <b>✓ был</b> → <b>Н не был</b> → пусто. Не отмеченный «был» на прошедшем занятии получает отработку этой темы (<b>О</b>) и видит её у себя на главной.</p>
+      ${S.length ? `<div class="table-scroll"><table class="journal-table">
         <thead><tr><th class="sticky">Ученик</th>${head}</tr></thead>
-        <tbody>${rows}<tr><td class="sticky note">Присутствовали</td>${totals}</tr></tbody></table></div>
-      <div class="row"><span class="legend"><i class="att was">✓</i> был(а)</span><span class="legend"><i class="att miss">Н</i> не был(а)</span><span class="legend"><i class="att owe">О</i> не отмечен — отработка</span></div>
-      <h2 class="sub">Отметить всех на занятии</h2>
-      <div class="row">${dated.filter(l => l.lesson_date <= D.today).slice(-4).map(l => `<button type="button" class="btn small ghost" data-all="${l.pair}">${pairNo(l.pair)} · ${dShort(l.lesson_date)}: все были</button>`).join("")}</div>`;
+        <tbody>${rows}<tr><td class="sticky note">Присутствовали</td>${totals}</tr><tr><td class="sticky note">Отметить всех</td>${allBtns}</tr></tbody></table></div>
+      <div class="row"><span class="legend"><i class="att was">✓</i> был(а)</span><span class="legend"><i class="att miss">Н</i> не был(а)</span><span class="legend"><i class="att owe">О</i> не отмечен — отработка</span><span class="legend"><i class="att off">·</i> нет даты</span></div>`
+      : `<div class="card yellow"><h2>Пока нет учеников</h2><p>Даты можно поставить уже сейчас. Ученики появятся автоматически, когда начнут проходить тесты или откроют теорию.</p></div>
+         <div class="table-scroll"><table class="journal-table"><thead><tr><th class="sticky">Даты</th>${head}</tr></thead></table></div>`}`;
     bindMark(el);
+    el.querySelectorAll("[data-mod]").forEach(b => b.addEventListener("click", () => { jModule = b.dataset.mod; markPair = null; render(); }));
+    el.querySelectorAll("input[data-date]").forEach(inp => inp.addEventListener("change", () => {
+      call("journal_set_date", { p_pair: Number(inp.dataset.date), p_date: inp.value || null });
+    }));
     el.querySelectorAll("button.att").forEach(b => b.addEventListener("click", () => {
       if (busy) return;
       const pair = Number(b.dataset.pair), key = b.dataset.key;
@@ -346,7 +364,7 @@
     el.querySelectorAll("[data-all]").forEach(b => b.addEventListener("click", async () => {
       if (busy) return;
       const pair = Number(b.dataset.all);
-      busy = true; b.textContent = "Сохраняем…";
+      busy = true; b.textContent = "…";
       for (const s of S) if (s.marks[pair] !== true) {
         try { await window.quizRpc("journal_set_present", { p_code: code, p_pair: pair, p_key: s.key, p_present: true }); } catch (e) { flash = "Часть отметок не сохранилась. Проверьте интернет."; }
       }

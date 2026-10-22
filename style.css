@@ -635,3 +635,12 @@ td.mark.total { font-weight: 600; font-variant-numeric: tabular-nums; }
 .seg-b:disabled { opacity: .4; cursor: default; }
 .seg-b.on.was { background: var(--good); color: var(--white); }
 .seg-b.on.miss { background: var(--bad); color: var(--white); }
+
+/* журнал: модули и даты в заголовках */
+.mod-chips button.chip { cursor: pointer; }
+table.journal-table th.lesson { vertical-align: bottom; min-width: 132px; max-width: 150px; padding: 8px 6px; white-space: normal; text-align: center; }
+table.journal-table th.lesson .lt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; font-weight: 500; line-height: 1.25; margin: 2px 0 6px; min-height: 30px; }
+table.journal-table th.lesson.nodate .date-in { outline: 2px dashed var(--peach); }
+.date-in.sm { font-size: 13px; padding: 6px 8px; width: 100%; max-width: 140px; }
+.att.off { cursor: default; color: var(--ink-2); opacity: .5; }
+.linkbtn.small-all { font-size: 12px; padding: 4px; text-decoration: underline; }
