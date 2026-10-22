@@ -217,6 +217,42 @@
   // «сдано» — по сдачам с этого устройства
   const otrSent = o => new Set(window.OtrStore.get(o.id).map(x => x.task)).size;
 
+  // ---------- назначенные отработки: пропущенные пары из журнала преподавателя (по имени и фамилии)
+  let assignCache = null;
+  async function loadAssignments() {
+    const who = window.Student.get();
+    try { assignCache = await window.quizRpc("student_assignments", { p_first_name: who.first, p_last_name: who.last }); }
+    catch (e) { assignCache = assignCache || []; }
+    return assignCache;
+  }
+  const otrMeta = id => (window.OTRABOTKI || []).find(o => o.id === id && o.status === "open");
+  function assignHtml(list) {
+    const open = (list || []).filter(a => !(a.otr_tasks.length && a.otr_tasks.every(t => a.task_status[t] === "ok")));
+    if (!open.length) return "";
+    const rows = open.map(a => {
+      const date = a.lesson_date ? new Date(a.lesson_date + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" }) : "";
+      const st = a.otr_tasks.map(t => a.task_status[t]);
+      const label = st.some(x => x === "redo") ? "на доработку" : st.length && st.every(x => x) ? "на проверке" : st.some(x => x) ? "частично сдана" : "назначена";
+      const m = otrMeta(a.otr_module);
+      const task = a.otr_tasks.find(t => a.task_status[t] !== "ok");
+      const href = m ? "otrabotka.html?m=" + encodeURIComponent(m.id) + (task ? "&p=" + encodeURIComponent(task) : "") : "";
+      const inner = `<span class="sw" style="background:var(--white)">${String(a.pair).padStart(2, "0")}</span>
+        <div class="grow">${esc(a.title)}<small>${date ? "пропуск " + date + " · " : ""}${m ? label : "материалы появятся позже — уточните у преподавателя"}</small></div>${m ? '<span class="go">›</span>' : ""}`;
+      return m ? `<a class="li" href="${href}">${inner}</a>` : `<div class="li">${inner}</div>`;
+    }).join("");
+    return `<section class="card peach assign">
+      <div class="row"><h2 class="grow">Вам назначена отработка</h2><span class="pill plain">${open.length}</span></div>
+      <p class="note ink">Вы пропустили ${open.length === 1 ? "занятие" : "занятия"}. Разберите тему сами и сдайте практику — преподаватель проверит.</p>
+      <div class="list">${rows}</div>
+    </section>`;
+  }
+  function mountAssignments() {
+    const box = document.getElementById("assign");
+    if (!box) return;
+    if (assignCache) box.innerHTML = assignHtml(assignCache);
+    loadAssignments().then(list => { const b = document.getElementById("assign"); if (b) b.innerHTML = assignHtml(list); });
+  }
+
   // ---------- главная: что делать дальше и сводка
   function homeTab() {
     const who = window.Student.get();
@@ -238,6 +274,7 @@
     app.innerHTML = `
       <div class="hello"><div><p class="eyebrow">Привет,</p><h1 class="h-name">${esc(who.first)}!</h1></div>
         <a class="ava" href="#profile" aria-label="Профиль">${avaInner(who)}</a></div>
+      <div id="assign"></div>
       <div class="cols">
         <div class="col">${step}</div>
         <div class="col">
@@ -256,6 +293,7 @@
         <a class="tile" href="#chat" style="background:var(--mint)"><b>Чат</b><span>группа и объявления</span></a>
       </div>`;
     bindAgain();
+    mountAssignments();
   }
 
   // ---------- все тесты
@@ -284,8 +322,10 @@
     }).join("");
     app.innerHTML = `
       <h1>Отработки</h1>
+      <div id="assign"></div>
       <p class="muted">Пропустили пару или тема не далась? Разберите её сами: короткий конспект, примеры, самопроверка и практика. Работу сдаёте ссылкой — преподаватель проверит.</p>
       <div class="list">${rows || `<p class="note">Пока нет открытых отработок.</p>`}</div>`;
+    mountAssignments();
   }
 
   function theoryTab() {

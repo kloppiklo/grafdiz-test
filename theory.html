@@ -26,6 +26,7 @@
 <iframe id="deck" title="Презентация" allowfullscreen></iframe>
 
 <script src="tests.js"></script>
+<script src="config.js"></script>
 <script>
 // Презентация с теорией к тесту: theory.html?t=color. Файл берётся из поля theory в tests.js,
 // а верхняя полоска даёт вернуться на главную — в приложении на телефоне нет кнопки «назад».
@@ -38,6 +39,9 @@
   document.getElementById("totest").href = "test.html?t=" + encodeURIComponent(meta.id);
   const deck = document.getElementById("deck");
   deck.src = meta.theory;
+  // отмечаем для журнала преподавателя, что ученик открыл теорию (раз в день на тему считается одна строка)
+  const who = window.Student.get();
+  if (who.first && who.last && window.quizRpc) window.quizRpc("theory_view", { p_first_name: who.first, p_last_name: who.last, p_theory: meta.id }).catch(() => {});
   deck.addEventListener("load", () => { try { deck.contentWindow.focus(); } catch (e) {} });
 })();
 </script>

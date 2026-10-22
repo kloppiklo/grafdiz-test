@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f0e2">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="robots" content="noindex">
+<title>Журнал группы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap admin journal" id="app"></main>
+
+<script src="tests.js"></script>
+<script src="config.js"></script>
+<script>
+// Журнал преподавателя: успеваемость (тесты, теория, отработки, посещаемость), журнал посещений
+// по занятиям и расписание (даты занятий привязаны к темам — парам программы).
+// Ученик, не отмеченный «был» на прошедшем занятии, получает отработку этой темы.
+// Ученики собираются автоматически по имени и фамилии; опечатки можно объединить, лишних — скрыть.
+(function () {
+  const app = document.getElementById("app");
+  const CODE_KEY = "quiz_admin_code";
+  const OPEN_TESTS = window.TESTS.filter(t => t.status === "open");
+  const THEORY = OPEN_TESTS.filter(t => t.theory);
+  const AVATAR = ["yellow", "pink", "lavender", "mint", "peach", "blue"];
+  const VIEWS = [["perf", "Успеваемость"], ["journal", "Журнал"], ["schedule", "Расписание"]];
+
+  let code = "";
+  try { code = sessionStorage.getItem(CODE_KEY) || ""; } catch (e) {}
+  let view = (location.hash || "#perf").slice(1);
+  if (!VIEWS.some(v => v[0] === view)) view = "perf";
+  let D = null, openStudent = null, mergeFor = null, busy = false, flash = "";
+
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const dShort = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" }).replace(".", "") : "";
+  const dLong = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "long" }) : "";
+  const pairNo = n => String(n).padStart(2, "0");
+  const colorOf = key => AVATAR[[...key].reduce((h, c) => h + c.charCodeAt(0), 0) % AVATAR.length];
+  const nameOf = s => s.first + " " + s.last;
+  const pctCls = p => p >= 0.8 ? "good" : p >= 0.5 ? "mid" : "bad";
+
+  // ---------- вход
+  function login(errText) {
+    app.innerHTML = `
+      <div class="topbar"><a class="icon-btn" href="admin.html" aria-label="К результатам тестов">←</a><span class="chip">Для преподавателя</span></div>
+      <h1>Журнал <em>группы</em></h1>
+      <form class="card lavender login" id="login" novalidate>
+        <label class="field" for="code">Код преподавателя
+          <input type="password" id="code" autocomplete="current-password" required>
+        </label>
+        <p class="error" ${errText ? "" : "hidden"}>${esc(errText || "")}</p>
+        <button class="btn block" type="submit">Открыть журнал <span class="arr">→</span></button>
+      </form>`;
+    document.getElementById("login").addEventListener("submit", e => {
+      e.preventDefault();
+      code = document.getElementById("code").value.trim();
+      load();
+    });
+  }
+
+  async function load(quiet) {
+    try {
+      D = await window.quizRpc("journal_get", { p_code: code });
+      try { sessionStorage.setItem(CODE_KEY, code); } catch (e) {}
+      prepare();
+      render();
+    } catch (e) {
+      if (quiet === true) return;
+      try { sessionStorage.removeItem(CODE_KEY); } catch (e2) {}
+      login(e && /code/i.test(e.message) ? "Код не подошёл. Проверьте его и попробуйте ещё раз." : "Не удалось загрузить журнал. Проверьте интернет и попробуйте ещё раз.");
+    }
+  }
+  async function call(fn, args) {
+    busy = true;
+    try { await window.quizRpc(fn, Object.assign({ p_code: code }, args)); }
+    catch (e) { flash = "Не получилось сохранить. Проверьте интернет и попробуйте ещё раз."; }
+    busy = false;
+    await load(true);
+  }
+
+  // ---------- сводим данные по ученикам
+  let S = [];        // ученики с посчитанной успеваемостью
+  let PAST = [];     // занятия с датой не позже сегодняшней
+  function prepare() {
+    const att = {};
+    D.attendance.forEach(a => { (att[a.key] = att[a.key] || {})[a.pair] = a.present; });
+    PAST = D.lessons.filter(l => l.lesson_date && l.lesson_date <= D.today);
+    S = D.students.map(s => {
+      const k = s.key;
+      // тесты: лучший завершённый результат и попытки
+      const tests = {};
+      D.tests.filter(t => t.key === k).forEach(t => {
+        const cur = tests[t.quiz] || { best: null, tries: 0, open: 0 };
+        if (t.answered >= t.total) { cur.tries++; if (!cur.best || t.score > cur.best.score) cur.best = t; }
+        else cur.open = Math.max(cur.open, t.answered);
+        tests[t.quiz] = cur;
+      });
+      const theory = {};
+      D.theory.filter(t => t.key === k).forEach(t => { theory[t.theory] = t; });
+      const subs = D.subs.filter(x => x.key === k);
+      const marks = att[k] || {};
+      // отработки: прошедшие занятия без отметки «был»
+      const assigned = PAST.filter(l => marks[l.pair] !== true).map(l => {
+        const st = l.otr_tasks.map(task => (subs.find(x => x.module === l.otr_module && x.task === task) || {}).status);
+        let status = "todo";
+        if (!l.otr_module) status = "none";
+        else if (st.every(x => x === "ok")) status = "ok";
+        else if (st.some(x => x === "redo")) status = "redo";
+        else if (st.every(x => x)) status = "review";
+        else if (st.some(x => x)) status = "part";
+        return { lesson: l, status };
+      });
+      const present = PAST.filter(l => marks[l.pair] === true).length;
+      const doneTests = OPEN_TESTS.filter(t => tests[t.id] && tests[t.id].best);
+      const avg = doneTests.length ? doneTests.reduce((a, t) => a + tests[t.id].best.score / tests[t.id].best.total, 0) / doneTests.length : null;
+      return Object.assign({}, s, { tests, theory, subs, marks, assigned, present, avg, doneTests: doneTests.length });
+    });
+  }
+  const OTR_ST = {
+    todo: ["bad", "назначена"], part: ["mid", "частично сдана"], review: ["wait", "на проверке"],
+    redo: ["bad", "на доработку"], ok: ["good", "зачтена"], none: ["plain", "нет материалов"]
+  };
+  const openOtr = s => s.assigned.filter(a => a.status !== "ok");
+
+  // ---------- общий каркас
+  function render() {
+    const ts = document.querySelector(".table-scroll"), keepX = ts ? ts.scrollLeft : 0, keepY = window.scrollY;
+    const nav = VIEWS.map(([id, label]) => `<a class="chip ${id === view ? "dark" : ""}" href="#${id}">${label}</a>`).join("");
+    app.innerHTML = `
+      <div class="topbar">
+        <a class="icon-btn" href="./" aria-label="На главную">←</a><span class="chip">Для преподавателя</span>
+        <span class="grow"></span>
+        <a class="btn small ghost" href="admin.html">Тесты</a>
+        <a class="btn small ghost" href="admin-otr.html">Отработки</a>
+        <a class="btn small ghost" href="admin-chat.html">Чат</a>
+        <button type="button" class="icon-btn" id="refresh" aria-label="Обновить">↻</button>
+      </div>
+      <h1>Журнал <em>группы</em></h1>
+      <div class="chips">${nav}</div>
+      ${flash ? `<p class="error">${esc(flash)}</p>` : ""}
+      <div id="view"></div>`;
+    flash = "";
+    document.getElementById("refresh").onclick = () => load();
+    ({ perf: renderPerf, journal: renderJournal, schedule: renderSchedule })[view](document.getElementById("view"));
+    const ts2 = document.querySelector(".table-scroll");
+    if (ts2) ts2.scrollLeft = keepX;
+    window.scrollTo(0, keepY);
+  }
+  window.addEventListener("hashchange", () => {
+    const v = location.hash.slice(1);
+    if (VIEWS.some(x => x[0] === v)) { view = v; openStudent = null; mergeFor = null; if (D) { render(); window.scrollTo(0, 0); } }
+  });
+
+  // ---------- успеваемость
+  function renderPerf(el) {
+    const n = S.length;
+    const withAvg = S.filter(s => s.avg !== null);
+    const avg = withAvg.length ? Math.round(withAvg.reduce((a, s) => a + s.avg, 0) / withAvg.length * 100) : null;
+    const slots = n * PAST.length;
+    const attPct = slots ? Math.round(S.reduce((a, s) => a + s.present, 0) / slots * 100) : null;
+    const review = S.reduce((a, s) => a + s.assigned.filter(x => x.status === "review" || x.status === "part").length, 0);
+    const owe = S.reduce((a, s) => a + openOtr(s).length, 0);
+
+    const head = OPEN_TESTS.map(t => `<th class="num" title="${esc(t.title)}"><span class="dot-h" style="background:var(--${t.color})"></span>${esc(t.title)}</th>`).join("");
+    const rows = S.map(s => {
+      const cells = OPEN_TESTS.map(t => {
+        const r = s.tests[t.id];
+        const th = s.theory[t.id] ? `<span class="th-mark" title="Теория открыта: ${s.theory[t.id].views} раз">◉</span>` : (t.theory ? `<span class="th-mark off" title="Теорию не открывал(а)">○</span>` : "");
+        if (r && r.best) return `<td class="num">${th}<span class="pill ${pctCls(r.best.score / r.best.total)}">${r.best.score}/${r.best.total}</span></td>`;
+        if (r && r.open) return `<td class="num">${th}<span class="pill wait">${r.open}/${t.count}…</span></td>`;
+        return `<td class="num">${th}<span class="muted">—</span></td>`;
+      }).join("");
+      const ow = openOtr(s);
+      return `<tr class="srow ${openStudent === s.key ? "on" : ""}" data-key="${esc(s.key)}">
+        <td><span class="who"><span class="avatar sm" style="background:var(--${colorOf(s.key)})">${esc((s.first[0] || "") + (s.last[0] || "")).toUpperCase()}</span>${esc(s.last)} ${esc(s.first)}</span></td>
+        ${cells}
+        <td class="num">${PAST.length ? `${s.present}/${PAST.length}` : "—"}</td>
+        <td class="num">${ow.length ? `<span class="pill bad">${ow.length}</span>` : (s.assigned.length ? `<span class="pill good">✓</span>` : `<span class="muted">—</span>`)}</td>
+      </tr>`;
+    }).join("");
+
+    el.innerHTML = `
+      <div class="tiles">
+        <div class="tile" style="background:var(--mint)"><b>${n}</b><span>учеников</span></div>
+        <div class="tile" style="background:var(--lavender)"><b>${avg === null ? "—" : avg + "%"}</b><span>средний результат тестов</span></div>
+        <div class="tile" style="background:var(--yellow)"><b>${attPct === null ? "—" : attPct + "%"}</b><span>посещаемость</span></div>
+        <div class="tile" style="background:var(--pink)"><b>${owe}</b><span>отработок не закрыто${review ? ` · ${review} ждут проверки` : ""}</span></div>
+      </div>
+      ${n ? `<div class="table-scroll"><table class="perf">
+        <thead><tr><th>Ученик</th>${head}<th class="num">Был(а)</th><th class="num">Отработки</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+        <p class="note">Ячейка теста — лучший завершённый результат. ◉ — ученик открывал теорию к этому тесту, ○ — не открывал. «Был(а)» — сколько прошедших занятий отмечено. Нажмите на ученика, чтобы увидеть подробности.</p>
+        <div id="detail"></div>`
+      : `<div class="card yellow"><h2>Пока нет учеников</h2><p>Ученики появятся здесь автоматически, когда пройдут тест, откроют теорию, сдадут отработку или напишут в чат.</p></div>`}`;
+    el.querySelectorAll("tr.srow").forEach(tr => tr.addEventListener("click", () => {
+      openStudent = openStudent === tr.dataset.key ? null : tr.dataset.key; mergeFor = null; render();
+      const d = document.getElementById("detail"); if (d && openStudent) d.scrollIntoView({ behavior: "smooth", block: "start" });
+    }));
+    if (openStudent) renderDetail(document.getElementById("detail"));
+  }
+
+  function renderDetail(el) {
+    const s = S.find(x => x.key === openStudent);
+    if (!s || !el) return;
+    const tests = OPEN_TESTS.map(t => {
+      const r = s.tests[t.id], th = s.theory[t.id];
+      return `<div class="li"><span class="sw" style="background:var(--${t.color})"></span>
+        <div class="grow">${esc(t.title)}<small>${r && r.best ? `лучший результат, попыток: ${r.tries}` : r && r.open ? `начат, отвечено ${r.open}` : "не проходил(а)"}${t.theory ? ` · теория: ${th ? "открыта " + th.views + " раз" : "не открывал(а)"}` : ""}</small></div>
+        ${r && r.best ? `<span class="pill ${pctCls(r.best.score / r.best.total)}">${r.best.score} / ${r.best.total}</span>` : ""}</div>`;
+    }).join("");
+    const otr = s.assigned.length ? s.assigned.map(a => `<div class="li"><span class="sw" style="background:var(--cream)">${pairNo(a.lesson.pair)}</span>
+        <div class="grow">${esc(a.lesson.title)}<small>пропуск ${dLong(a.lesson.lesson_date)}${a.lesson.otr_module ? "" : " · отработки к этой теме пока нет"}</small></div>
+        <span class="pill ${OTR_ST[a.status][0]}">${OTR_ST[a.status][1]}</span></div>`).join("")
+      : `<p class="note">Пропусков нет — отработки не назначены.</p>`;
+    const others = S.filter(x => x.key !== s.key);
+    el.innerHTML = `
+      <section class="card ${colorOf(s.key)} student-card">
+        <div class="row"><h2 class="grow">${esc(nameOf(s))}</h2><button type="button" class="icon-btn" id="d-close" aria-label="Закрыть">✕</button></div>
+        <p class="note ink">Посещено ${s.present} из ${PAST.length} прошедших занятий${s.avg !== null ? ` · средний результат тестов ${Math.round(s.avg * 100)}%` : ""}</p>
+        <div class="cols">
+          <div class="col"><h3>Тесты и теория</h3><div class="list">${tests}</div></div>
+          <div class="col"><h3>Отработки</h3><div class="list">${otr}</div></div>
+        </div>
+        <div class="row">
+          ${mergeFor === s.key ? `
+            <label class="field grow" for="merge-into">Это тот же ученик, что и…
+              <select id="merge-into">${others.map(o => `<option value="${esc(o.key)}">${esc(o.last)} ${esc(o.first)}</option>`).join("")}</select></label>
+            <button type="button" class="btn small" id="merge-yes">Объединить</button>
+            <button type="button" class="btn small ghost" id="merge-no">Отмена</button>`
+          : `<button type="button" class="btn small ghost" id="merge">Объединить с другим именем</button>
+             <button type="button" class="btn small ghost" id="hide">Скрыть из журнала</button>`}
+        </div>
+        ${mergeFor === s.key ? `<p class="note ink">Все результаты и отметки «${esc(nameOf(s))}» перейдут к выбранному ученику. Пригодится, если имя написали по-разному.</p>` : ""}
+      </section>`;
+    el.querySelector("#d-close").onclick = () => { openStudent = null; render(); };
+    const m = el.querySelector("#merge"); if (m) m.onclick = () => { mergeFor = s.key; render(); };
+    const mn = el.querySelector("#merge-no"); if (mn) mn.onclick = () => { mergeFor = null; render(); };
+    const my = el.querySelector("#merge-yes"); if (my) my.onclick = () => {
+      const into = el.querySelector("#merge-into").value; mergeFor = null; openStudent = into;
+      call("journal_merge", { p_alias: s.key, p_canonical: into });
+    };
+    const h = el.querySelector("#hide"); if (h) h.onclick = () => { openStudent = null; call("journal_hide", { p_key: s.key, p_hidden: true }); };
+  }
+
+  // ---------- журнал посещений: ученики × занятия с датами
+  function renderJournal(el) {
+    const dated = D.lessons.filter(l => l.lesson_date).sort((a, b) => a.lesson_date.localeCompare(b.lesson_date) || a.pair - b.pair);
+    if (!dated.length) {
+      el.innerHTML = `<div class="card yellow"><h2>Сначала задайте даты занятий</h2><p>Во вкладке «Расписание» поставьте дату напротив каждой пары — здесь появятся колонки журнала.</p><a class="btn" href="#schedule">Открыть расписание <span class="arr">→</span></a></div>`;
+      return;
+    }
+    const head = dated.map(l => `<th class="lesson ${l.lesson_date > D.today ? "future" : ""}" title="${esc(l.title)}"><span>${dShort(l.lesson_date)}</span><small>${pairNo(l.pair)}</small></th>`).join("");
+    const rows = S.map(s => `<tr><td class="sticky"><span class="who"><span class="avatar sm" style="background:var(--${colorOf(s.key)})">${esc((s.first[0] || "") + (s.last[0] || "")).toUpperCase()}</span>${esc(s.last)} ${esc(s.first)}</span></td>
+      ${dated.map(l => {
+        const v = s.marks[l.pair], past = l.lesson_date <= D.today;
+        const st = v === true ? ["was", "✓", "был(а)"] : v === false ? ["miss", "Н", "не был(а) — отработка"] : past ? ["owe", "О", "не отмечен — назначена отработка"] : ["none", "", "не отмечен"];
+        return `<td class="mark"><button type="button" class="att ${st[0]}" data-pair="${l.pair}" data-key="${esc(s.key)}" title="${esc(st[2])}" aria-label="${esc(s.last + " " + s.first + ", пара " + pairNo(l.pair) + ": " + st[2])}">${st[1]}</button></td>`;
+      }).join("")}</tr>`).join("");
+    const totals = dated.map(l => `<td class="mark total">${S.filter(s => s.marks[l.pair] === true).length}</td>`).join("");
+    el.innerHTML = `
+      <p class="muted">Нажмите на клетку: <b>✓ был</b> → <b>Н не был</b> → пусто. Если на прошедшем занятии ученик не отмечен как присутствующий, ему автоматически назначается отработка этой темы — клетка покажет <b>О</b>, а ученик увидит отработку у себя на главной.</p>
+      <div class="table-scroll"><table class="journal-table">
+        <thead><tr><th class="sticky">Ученик</th>${head}</tr></thead>
+        <tbody>${rows}<tr><td class="sticky note">Присутствовали</td>${totals}</tr></tbody></table></div>
+      <div class="row"><span class="legend"><i class="att was">✓</i> был(а)</span><span class="legend"><i class="att miss">Н</i> не был(а)</span><span class="legend"><i class="att owe">О</i> не отмечен — отработка</span></div>
+      <h2 class="sub">Отметить всех на занятии</h2>
+      <div class="row">${dated.filter(l => l.lesson_date <= D.today).slice(-4).map(l => `<button type="button" class="btn small ghost" data-all="${l.pair}">${pairNo(l.pair)} · ${dShort(l.lesson_date)}: все были</button>`).join("")}</div>`;
+    el.querySelectorAll("button.att").forEach(b => b.addEventListener("click", () => {
+      if (busy) return;
+      const pair = Number(b.dataset.pair), key = b.dataset.key;
+      const s = S.find(x => x.key === key), v = s.marks[pair];
+      const next = v === true ? false : v === false ? null : true;
+      // сразу показываем новое состояние, потом сохраняем
+      if (next === null) delete s.marks[pair]; else s.marks[pair] = next;
+      b.className = "att " + (next === true ? "was" : next === false ? "miss" : "none");
+      b.textContent = next === true ? "✓" : next === false ? "Н" : "";
+      call("journal_set_present", { p_pair: pair, p_key: key, p_present: next });
+    }));
+    el.querySelectorAll("[data-all]").forEach(b => b.addEventListener("click", async () => {
+      if (busy) return;
+      const pair = Number(b.dataset.all);
+      busy = true; b.textContent = "Сохраняем…";
+      for (const s of S) if (s.marks[pair] !== true) {
+        try { await window.quizRpc("journal_set_present", { p_code: code, p_pair: pair, p_key: s.key, p_present: true }); } catch (e) { flash = "Часть отметок не сохранилась. Проверьте интернет."; }
+      }
+      busy = false; load(true);
+    }));
+  }
+
+  // ---------- расписание: дата для каждой пары
+  function renderSchedule(el) {
+    const otrTitle = id => ((window.OTRABOTKI || []).find(o => o.id === id) || {}).title;
+    const modules = [...new Set(D.lessons.map(l => l.module))];
+    const row = l => {
+      const state = !l.lesson_date ? "" : l.lesson_date > D.today ? `<span class="pill plain">впереди</span>` : `<span class="pill good">прошло</span>`;
+      return `<div class="li sched">
+        <span class="sw" style="background:var(--cream)">${pairNo(l.pair)}</span>
+        <div class="grow">${esc(l.title)}<small>${l.otr_module ? "отработка: " + esc(otrTitle(l.otr_module) || l.otr_module) : "отработки к этой теме пока нет"}</small></div>
+        ${state}
+        <input type="date" class="date-in" data-pair="${l.pair}" value="${l.lesson_date || ""}" aria-label="Дата пары ${pairNo(l.pair)}">
+      </div>`;
+    };
+    el.innerHTML = `
+      <p class="muted">Поставьте дату каждой пары. Дата привязывает занятие к теме: по ней журнал понимает, какое занятие прошло и какую отработку назначить пропустившим.</p>
+      ${modules.map(m => `<h2 class="sub">${esc(m)}</h2><div class="list">${D.lessons.filter(l => l.module === m).map(row).join("")}</div>`).join("")}`;
+    el.querySelectorAll("input.date-in").forEach(inp => inp.addEventListener("change", () => {
+      call("journal_set_date", { p_pair: Number(inp.dataset.pair), p_date: inp.value || null });
+    }));
+  }
+
+  setInterval(() => { if (D && code && !busy && view === "perf" && document.visibilityState === "visible") load(true); }, 30000);
+  if (code) load(); else login();
+})();
+</script>
+</body>
+</html>
