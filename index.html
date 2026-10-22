@@ -196,6 +196,7 @@
         <h3>${esc(t.title)}</h3>
         <div class="row">
           ${t.theory ? `<a class="btn ghost small" href="theory.html?t=${encodeURIComponent(t.id)}">Теория</a>` : ""}
+          ${(t.extras || []).map(x => `<a class="btn ghost small" href="${esc(x.href)}" target="_blank" rel="noopener">${esc(x.short || "Тетрадь")}</a>`).join("")}
           <a class="btn small" href="test.html?t=${encodeURIComponent(t.id)}" data-id="${esc(t.id)}" ${r ? "data-again" : ""}>${r ? "Пересдать" : "Начать"} <span class="arr">→</span></a>
         </div>
       </section>`;
