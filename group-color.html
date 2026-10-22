@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f0e2">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Цветовое агентство</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="style.css?v=24">
+<style>
+  .wrap.task { max-width: 920px; }
+  .draw-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .gcard { border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .gcard .g-no { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .gcard b { font-size: 20px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; }
+  .gcard .g-mood { font-size: 14px; color: var(--ink-2); }
+  .gcard .g-scheme { display: inline-flex; align-self: flex-start; background: var(--ink); color: var(--white); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
+  .gcard .linkbtn { align-self: flex-start; padding: 0; font-size: 13px; text-decoration: underline; }
+  .count-pick { display: inline-flex; gap: 4px; background: var(--white); border-radius: 999px; padding: 4px; }
+  .count-pick button { border: 0; background: none; font: inherit; font-weight: 600; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; }
+  .count-pick button.on { background: var(--ink); color: var(--white); }
+  .timeline { display: flex; flex-direction: column; gap: 8px; }
+  .step { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; background: var(--white); border-radius: var(--r-row); padding: 14px; }
+  .step .t { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .step small { display: block; color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+  .roles, .crit { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+  .role { border-radius: 18px; padding: 14px; }
+  .role b { display: block; margin-bottom: 4px; }
+  ul.clean { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .frames { display: flex; flex-wrap: wrap; gap: 6px; }
+  .frames span { background: var(--cream); border-radius: 999px; padding: 6px 10px; font-size: 13px; }
+</style>
+</head>
+<body>
+<main class="wrap task" id="app">
+  <div class="topbar"><a class="icon-btn" href="./#theory" aria-label="Назад">←</a><span class="chip">Модуль 2 · цвет</span><span class="chip">работа в группах</span></div>
+  <h1>Цветовое<br><em>агентство</em></h1>
+  <p class="muted">Каждая группа — маленькое дизайн-агентство. Вы получаете бриф и цветовую схему-ограничение, строите палитру и делаете три носителя в общем Figma-файле. 80–90 минут, группы по 3–4 человека.</p>
+
+  <section class="card pink">
+    <div class="row"><h2 class="grow">Жеребьёвка</h2>
+      <div class="count-pick" role="group" aria-label="Сколько групп" id="count"></div>
+    </div>
+    <p class="note ink">Выберите число групп и нажмите «Раздать». Бриф и схема у каждой группы свои. Не понравилось — «перетянуть» у отдельной группы.</p>
+    <div class="row"><button type="button" class="btn" id="deal">Раздать брифы и схемы <span class="arr">→</span></button></div>
+    <div class="draw-groups" id="groups"></div>
+  </section>
+
+  <h2 class="sub">Роли в группе</h2>
+  <div class="roles">
+    <div class="role" style="background:var(--yellow)"><b>Колорист</b>Строит палитру по схеме в HSB и сохраняет её как Color Styles.</div>
+    <div class="role" style="background:var(--lavender)"><b>Исследователь</b>Собирает мудборд из 8–10 референсов и выписывает из них цвета.</div>
+    <div class="role" style="background:var(--mint)"><b>Верстальщик</b>1–2 человека. Делает носители только цветами палитры.</div>
+    <div class="role" style="background:var(--peach)"><b>Контролёр</b>Проверяет ч/б, контраст текста и 60/30/10, презентует работу.</div>
+  </div>
+  <p class="note">Роли можно менять на каждом этапе — чтобы все попробовали всё.</p>
+
+  <h2 class="sub">Ход работы</h2>
+  <div class="timeline">
+    <div class="step"><span class="t">10 мин</span><div><b>Разбор брифа</b><small>3 слова-настроения и целевая аудитория — стикерами на мудборде.</small></div></div>
+    <div class="step"><span class="t">15 мин</span><div><b>Мудборд и палитра</b><small>5 цветов по выпавшей схеме: главный, второй, акцент и 2 нейтральных. Подписать HEX, сохранить как Color Styles.</small></div></div>
+    <div class="step"><span class="t">25 мин</span><div><b>Носители</b><small>Афиша 1080 × 1350, сторис 1080 × 1920, баннер 1200 × 600 — только цветами палитры.</small></div></div>
+    <div class="step"><span class="t">10 мин</span><div><b>Обмен палитрами</b><small>Отдайте свою палитру соседней группе, возьмите чужую и за 10 минут сделайте ещё одну сторис для своего брифа.</small></div></div>
+    <div class="step"><span class="t">10 мин</span><div><b>Проверка</b><small>Копии носителей в ч/б, контраст текста (плагин Contrast или Stark, не меньше 4.5:1), доли цветов ≈ 60/30/10.</small></div></div>
+    <div class="step"><span class="t">15 мин</span><div><b>Просмотр</b><small>2 минуты на группу, остальные голосуют стикерами.</small></div></div>
+  </div>
+
+  <h2 class="sub">Фреймы на странице группы</h2>
+  <div class="frames"><span>Палитра 1440 × 400</span><span>Мудборд 1440 × 900</span><span>Афиша 1080 × 1350</span><span>Сторис 1080 × 1920</span><span>Баннер 1200 × 600</span><span>Чужая палитра 1080 × 1920</span><span>Проверка 1440 × 900</span></div>
+
+  <div class="cols">
+    <div class="col">
+      <h2 class="sub">Что показать на просмотре</h2>
+      <section class="card">
+        <ul class="clean">
+          <li>Бриф и 3 слова-настроения</li>
+          <li>Палитру: какая схема и почему именно эти оттенки</li>
+          <li>Три носителя: считывается ли настроение без текста</li>
+          <li>Сторис на чужой палитре: что сработало, что пришлось «спасать»</li>
+          <li>Проверку в ч/б: что слилось и что исправили</li>
+        </ul>
+      </section>
+    </div>
+    <div class="col">
+      <h2 class="sub">Критерии</h2>
+      <section class="card">
+        <ul class="clean">
+          <li>Палитра соответствует схеме, у цветов подписаны HEX</li>
+          <li>На носителях только цвета палитры, через Color Styles</li>
+          <li>Пропорция ≈ 60/30/10, комплементарная пара не поровну</li>
+          <li>Текст читается в ч/б, контраст не меньше 4.5:1</li>
+          <li>Настроение брифа считывается без подписи</li>
+          <li>Группа объясняет свой выбор</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <h2 class="sub">Голосование стикерами</h2>
+  <section class="card yellow">
+    <p>У каждого 3 стикера:</p>
+    <ul class="clean">
+      <li><b>Зелёный</b> — «сразу понятно, о чём»</li>
+      <li><b>Жёлтый</b> — «лучшая палитра»</li>
+      <li><b>Красный</b> — «смелее всех обошлись с ограничением»</li>
+    </ul>
+  </section>
+  <p class="note">Короткий вариант на 45 минут: без мудборда и обмена палитрами — палитра → афиша + сторис → проверка в ч/б → просмотр.</p>
+</main>
+
+<script>
+// Жеребьёвка для занятия: у каждой группы свой бриф и своя схема. Результат запоминается на этом устройстве.
+(function () {
+  const BRIEFS = [
+    ["Кофейня «Утро»", "уютно, тепло, для студентов"],
+    ["Фестиваль электронной музыки", "энергия, ночь, драйв"],
+    ["Детская стоматология", "доверие и спокойствие, но не скучно"],
+    ["Эко-магазин без упаковки", "природа, честность, лёгкость"],
+    ["Банк для подростков", "надёжно и при этом современно"],
+    ["Выставка «Тревога»", "музей современного искусства: напряжение, беспокойство"]
+  ];
+  const SCHEMES = ["Комплементарная", "Аналоговая", "Раздельно-комплементарная", "Триада", "Тетрада", "Монохромная"];
+  const COLORS = ["yellow", "lavender", "mint", "peach", "blue", "pink"];
+  const KEY = "group_color_draw";
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  let st = null;
+  try { st = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!st) st = { n: 4, groups: [] };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
+
+  function deal() {
+    const b = shuffle([...BRIEFS.keys()]), s = shuffle([...SCHEMES.keys()]);
+    st.groups = Array.from({ length: st.n }, (_, i) => ({ b: b[i], s: s[i] }));
+    save(); render();
+  }
+  // перетянуть у одной группы: берём бриф/схему, которых нет у других
+  function redraw(i, what) {
+    const used = st.groups.map(g => g[what]);
+    const pool = [...(what === "b" ? BRIEFS : SCHEMES).keys()].filter(k => !used.includes(k));
+    if (!pool.length) return;
+    st.groups[i][what] = pool[Math.floor(Math.random() * pool.length)];
+    save(); render();
+  }
+  function render() {
+    document.getElementById("count").innerHTML = [3, 4, 5, 6].map(k => `<button type="button" class="${k === st.n ? "on" : ""}" data-n="${k}" aria-pressed="${k === st.n}">${k}</button>`).join("");
+    document.getElementById("groups").innerHTML = st.groups.map((g, i) => `
+      <div class="gcard" style="background:var(--${COLORS[i % COLORS.length]})">
+        <span class="g-no">Группа ${i + 1}</span>
+        <b>${esc(BRIEFS[g.b][0])}</b>
+        <span class="g-mood">${esc(BRIEFS[g.b][1])}</span>
+        <span class="g-scheme">${esc(SCHEMES[g.s])}</span>
+        <div class="row"><button type="button" class="linkbtn" data-re="b" data-i="${i}">другой бриф</button><button type="button" class="linkbtn" data-re="s" data-i="${i}">другая схема</button></div>
+      </div>`).join("");
+    document.querySelectorAll("[data-n]").forEach(b => b.onclick = () => { st.n = Number(b.dataset.n); st.groups = []; save(); render(); });
+    document.querySelectorAll("[data-re]").forEach(b => b.onclick = () => redraw(Number(b.dataset.i), b.dataset.re));
+  }
+  document.getElementById("deal").onclick = deal;
+  render();
+})();
+</script>
+</body>
+</html>

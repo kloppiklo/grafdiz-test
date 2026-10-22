@@ -13,7 +13,10 @@ window.TESTS = [
     title: "Цвет", module: "Модуль 2 · цвет", count: 12,
     topics: ["Свет и глаз", "Цветовой круг", "Схемы", "Модели", "Психология"],
     theory: "materials/color.html",
-    extras: [{ title: "Рабочая тетрадь «Цвет»", note: "PDF для печати, 12 страниц", href: "materials/color-workbook.pdf" }]
+    extras: [
+      { title: "Рабочая тетрадь «Цвет»", note: "PDF для печати, 12 страниц", href: "materials/color-workbook.pdf" },
+      { title: "Групповое задание «Цветовое агентство»", note: "работа в группах в Figma", href: "group-color.html", short: "Задание" }
+    ]
   },
   {
     id: "grid", status: "open", color: "lavender",

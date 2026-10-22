@@ -193,7 +193,7 @@
         <h3>${esc(t.title)}</h3>
         <div class="row">
           ${t.theory ? `<a class="btn ghost small" href="theory.html?t=${encodeURIComponent(t.id)}">Теория</a>` : ""}
-          ${(t.extras || []).map(x => `<a class="btn ghost small" href="${esc(x.href)}" target="_blank" rel="noopener">${esc(x.short || "Тетрадь")}</a>`).join("")}
+          ${(t.extras || []).map(x => `<a class="btn ghost small" href="${esc(x.href)}" ${/\.pdf$/i.test(x.href) ? 'target="_blank" rel="noopener"' : ""}>${esc(x.short || "Тетрадь")}</a>`).join("")}
           <a class="btn small" href="test.html?t=${encodeURIComponent(t.id)}" data-id="${esc(t.id)}" ${r ? "data-again" : ""}>${r ? "Пересдать" : "Начать"} <span class="arr">→</span></a>
         </div>
       </section>`;
@@ -334,8 +334,8 @@
     const rows = window.TESTS.map(t => t.status === "open" && t.theory ? `
       <a class="li" href="theory.html?t=${encodeURIComponent(t.id)}"><span class="sw" style="background:var(--${t.color})"></span>
         <div class="grow">${esc(t.title)}<small>${esc(t.module)} · презентация</small></div><span class="go">›</span></a>` + (t.extras || []).map(x => `
-      <a class="li" href="${esc(x.href)}" target="_blank" rel="noopener"><span class="sw" style="background:var(--${t.color})">↓</span>
-        <div class="grow">${esc(x.title)}<small>${esc(t.module)} · ${esc(x.note)}</small></div><span class="go">↗</span></a>`).join("") : `
+      <a class="li" href="${esc(x.href)}" ${/\.pdf$/i.test(x.href) ? 'target="_blank" rel="noopener"' : ""}><span class="sw" style="background:var(--${t.color})">${/\.pdf$/i.test(x.href) ? "↓" : "✦"}</span>
+        <div class="grow">${esc(x.title)}<small>${esc(t.module)} · ${esc(x.note)}</small></div><span class="go">${/\.pdf$/i.test(x.href) ? "↗" : "›"}</span></a>`).join("") : `
       <div class="li soonrow"><span class="sw" style="background:var(--${t.color})"></span>
         <div class="grow">${esc(t.title)}<small>${esc(t.module)} · скоро</small></div></div>`).join("");
     app.innerHTML = `
