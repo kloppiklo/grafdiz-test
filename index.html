@@ -25,7 +25,7 @@
 <script src="config.js"></script>
 <script>
 // Главная-приложение: при первом запуске — welcome и знакомство (имя хранится на телефоне),
-// дальше — четыре вкладки: тесты, теория, прогресс, профиль. Вкладка — в адресе (#theory и т. п.).
+// дальше — вкладки: главная, тесты, отработки, теория, прогресс, чат, профиль. Вкладка — в адресе (#theory и т. п.).
 (function () {
   const app = document.getElementById("app");
   const bar = document.getElementById("tabbar");
@@ -52,13 +52,17 @@
   })();
 
   const ICONS = {
+    home: '<path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/>',
+    otr: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM8.5 12l2 2 4-4M8.5 17h7"/>',
     tests: '<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',
     theory: '<path d="M4 5h7a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4zM20 5h-7a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h7z"/>',
     progress: '<path d="M5 19V11M12 19V5M19 19v-6"/>',
     chat: '<path d="M5 5h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-8l-4 3v-3H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/>',
     profile: '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6"/>'
   };
-  const TABS = [["tests", "Главная"], ["theory", "Теория"], ["progress", "Прогресс"], ["chat", "Чат"], ["profile", "Профиль"]];
+  const TABS = [["home", "Главная"], ["tests", "Тесты"], ["otr", "Отработки"], ["theory", "Теория"], ["progress", "Прогресс"], ["chat", "Чат"], ["profile", "Профиль"]];
+  // на телефоне «Профиль» в нижнем меню не помещается — он открывается по аватару на главной
+  const WIDE_ONLY = ["profile"];
 
   // ---------- данные о прохождении (всё — на этом устройстве)
   function inProgress(t) {
@@ -165,32 +169,23 @@
       if (!first || !last) { document.getElementById("reg-err").hidden = false; return; }
       window.Student.set(first, last);
       write(ONBOARDED, true);
-      show(fromProfile ? "profile" : "tests");
+      show(fromProfile ? "profile" : "home");
     });
   }
 
   // ---------- вкладки
   function renderBar(active) {
     bar.hidden = false;
-    bar.innerHTML = `<a class="tab-brand" href="#tests"><img src="icons/icon-192.png" alt="">Граф.<em>дизайн</em></a>` + TABS.map(([id, label]) => `
-      <a class="tab ${id === active ? "on" : ""}" href="#${id}" ${id === active ? 'aria-current="page"' : ""}>
+    bar.innerHTML = `<a class="tab-brand" href="#home"><img src="icons/icon-192.png" alt="">Граф.<em>дизайн</em></a>` + TABS.map(([id, label]) => `
+      <a class="tab ${id === active ? "on" : ""} ${WIDE_ONLY.includes(id) ? "wide-only" : ""}" href="#${id}" ${id === active ? 'aria-current="page"' : ""}>
         <span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id]}</svg></span>${label}</a>`).join("");
   }
 
-  function testsTab() {
-    const who = window.Student.get();
-    const cont = OPEN.find(t => inProgress(t) !== null);
-    const contCard = cont ? `
-      <section class="mini dark">
-        <div class="top"><span class="pill ondark">Продолжить</span><span class="note ondark">${inProgress(cont)} из ${cont.count}</span></div>
-        <h3>${esc(cont.title)}</h3>
-        <div class="bar ondark"><i style="width:${Math.round(inProgress(cont) / cont.count * 100)}%;background:var(--${cont.color})"></i></div>
-        <a class="btn block light" href="test.html?t=${encodeURIComponent(cont.id)}">Продолжить тест <span class="arr">→</span></a>
-      </section>` : "";
-    const cards = OPEN.filter(t => t !== cont).map(t => {
-      const r = best(t);
-      const pill = r ? `<span class="pill ${cls(r)}">${r.score} / ${r.total}</span>` : `<span class="pill plain">${t.count} вопросов</span>`;
-      return `
+  // карточка теста: результат, теория, тетрадь, начать/пересдать
+  function testCard(t) {
+    const r = best(t);
+    const pill = r ? `<span class="pill ${cls(r)}">${r.score} / ${r.total}</span>` : `<span class="pill plain">${t.count} вопросов</span>`;
+    return `
       <section class="mini" style="background:var(--${t.color})">
         <div class="top"><span class="pill plain">${esc(t.module)}</span>${pill}</div>
         <h3>${esc(t.title)}</h3>
@@ -200,30 +195,97 @@
           <a class="btn small" href="test.html?t=${encodeURIComponent(t.id)}" data-id="${esc(t.id)}" ${r ? "data-again" : ""}>${r ? "Пересдать" : "Начать"} <span class="arr">→</span></a>
         </div>
       </section>`;
-    }).join("");
+  }
+  function contCardHtml(cont) {
+    return `
+      <section class="mini dark">
+        <div class="top"><span class="pill ondark">Продолжить</span><span class="note ondark">${inProgress(cont)} из ${cont.count}</span></div>
+        <h3>${esc(cont.title)}</h3>
+        <div class="bar ondark"><i style="width:${Math.round(inProgress(cont) / cont.count * 100)}%;background:var(--${cont.color})"></i></div>
+        <a class="btn block light" href="test.html?t=${encodeURIComponent(cont.id)}">Продолжить тест <span class="arr">→</span></a>
+      </section>`;
+  }
+  // «Пересдать»: сбрасываем прошлое прохождение на этом устройстве
+  function bindAgain() {
+    app.querySelectorAll("[data-again]").forEach(a => a.addEventListener("click", () => {
+      try { localStorage.removeItem(window.quizStoreKey(a.dataset.id)); } catch (e) {}
+    }));
+  }
+  // 1 материал, 2 материала, 5 материалов
+  const plural = (n, one, few, many) => { const m10 = n % 10, m100 = n % 100; return n + " " + (m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many); };
+  const OTR_OPEN = () => (window.OTRABOTKI || []).filter(o => o.status === "open");
+  // «сдано» — по сдачам с этого устройства
+  const otrSent = o => new Set(window.OtrStore.get(o.id).map(x => x.task)).size;
+
+  // ---------- главная: что делать дальше и сводка
+  function homeTab() {
+    const who = window.Student.get();
+    const cont = OPEN.find(t => inProgress(t) !== null);
+    const next = OPEN.find(t => !best(t) && t !== cont);
+    const done = OPEN.filter(t => best(t));
+    const avg = done.length ? Math.round(done.reduce((s, t) => s + pct(best(t)), 0) / done.length * 100) : null;
+    const weak = done.filter(t => pct(best(t)) < 0.8).sort((a, b) => pct(best(a)) - pct(best(b)))[0];
+    const otrs = OTR_OPEN();
+    const otrDone = otrs.reduce((s, o) => s + otrSent(o), 0), otrAll = otrs.reduce((s, o) => s + o.pairs, 0);
+    const materials = OPEN.filter(t => t.theory).length + OPEN.reduce((s, t) => s + (t.extras || []).length, 0);
+
+    let step = "";
+    if (cont) step = contCardHtml(cont);
+    else if (next) step = `<div class="next-wrap"><p class="eyebrow">Следующий тест</p>${testCard(next)}</div>`;
+    else if (weak) step = `<div class="next-wrap"><p class="eyebrow">Можно улучшить результат</p>${testCard(weak)}</div>`;
+    else step = `<section class="card mint"><h2>Все открытые тесты пройдены</h2><p>Новые темы появятся по ходу курса. А пока можно заглянуть в теорию или отработки.</p></section>`;
+
+    app.innerHTML = `
+      <div class="hello"><div><p class="eyebrow">Привет,</p><h1 class="h-name">${esc(who.first)}!</h1></div>
+        <a class="ava" href="#profile" aria-label="Профиль">${avaInner(who)}</a></div>
+      <div class="cols">
+        <div class="col">${step}</div>
+        <div class="col">
+          <a class="card lavender home-progress" href="#progress">
+            <p class="eyebrow">Ваш прогресс</p>
+            <p class="big-num">${done.length} <small>из ${OPEN.length} тестов</small></p>
+            <div class="bar light"><i style="width:${OPEN.length ? Math.round(done.length / OPEN.length * 100) : 0}%"></i></div>
+            <p class="note ink">${avg === null ? "Пройдите первый тест — здесь появится средний результат." : "Средний результат — " + avg + "%"}</p>
+          </a>
+        </div>
+      </div>
+      <div class="tiles">
+        <a class="tile" href="#tests" style="background:var(--yellow)"><b>Тесты</b><span>${OPEN.length} открыто</span></a>
+        <a class="tile" href="#otr" style="background:var(--pink)"><b>Отработки</b><span>${otrDone ? "сдано " + otrDone + " из " + otrAll : plural(otrs.length, "блок", "блока", "блоков")}</span></a>
+        <a class="tile" href="#theory" style="background:var(--blue)"><b>Теория</b><span>${plural(materials, "материал", "материала", "материалов")}</span></a>
+        <a class="tile" href="#chat" style="background:var(--mint)"><b>Чат</b><span>группа и объявления</span></a>
+      </div>`;
+    bindAgain();
+  }
+
+  // ---------- все тесты
+  function testsTab() {
+    const cont = OPEN.find(t => inProgress(t) !== null);
+    const cards = OPEN.filter(t => t !== cont).map(testCard).join("");
     const soon = SOON.map(t => `
       <div class="li soonrow"><span class="dot-c" style="background:var(--${t.color})"></span>
         <div class="grow">${esc(t.title)}<small>${esc(t.module)}</small></div><span class="pill plain">скоро</span></div>`).join("");
-    // отработки пропущенных пар (otrabotka.html); «сдано» — по сдачам с этого устройства
-    const otr = (window.OTRABOTKI || []).filter(o => o.status === "open").map(o => {
-      const sent = new Set(window.OtrStore.get(o.id).map(x => x.task)).size;
+    app.innerHTML = `
+      <h1>Тесты</h1>
+      <p class="muted">После каждого ответа сразу видно, верно ли, а результат попадает к преподавателю. Пересдавать можно сколько угодно.</p>
+      <div class="grid-cards">${cont ? contCardHtml(cont) : ""}${cards}</div>
+      <h2 class="sub">Дальше по курсу</h2>
+      <div class="list">${soon}</div>`;
+    bindAgain();
+  }
+
+  // ---------- отработки пропущенных пар (otrabotka.html)
+  function otrTab() {
+    const rows = OTR_OPEN().map(o => {
+      const sent = otrSent(o);
       return `
       <a class="li" href="otrabotka.html?m=${encodeURIComponent(o.id)}"><span class="sw" style="background:var(--${o.color})"></span>
         <div class="grow">${esc(o.title)}<small>${esc(o.module)} · ${sent ? "сдано " + sent + " из " + o.pairs : "конспект, примеры, практика"}</small></div><span class="go">›</span></a>`;
     }).join("");
     app.innerHTML = `
-      <div class="hello"><div><p class="eyebrow">Привет,</p><h1 class="h-name">${esc(who.first)}!</h1></div>
-        <a class="ava" href="#profile" aria-label="Профиль">${avaInner(who)}</a></div>
-      <div class="grid-cards">${contCard}${cards}</div>
-      <div class="cols">
-        ${otr ? `<div class="col"><h2 class="sub">Отработки</h2><p class="muted">Пропустили пару или тема не далась? Разберите её сами и сдайте практику.</p><div class="list">${otr}</div></div>` : ""}
-        <div class="col"><h2 class="sub">Дальше по курсу</h2>
-        <div class="list">${soon}</div></div>
-      </div>`;
-    // «Пересдать»: сбрасываем прошлое прохождение на этом устройстве
-    app.querySelectorAll("[data-again]").forEach(a => a.addEventListener("click", () => {
-      try { localStorage.removeItem(window.quizStoreKey(a.dataset.id)); } catch (e) {}
-    }));
+      <h1>Отработки</h1>
+      <p class="muted">Пропустили пару или тема не далась? Разберите её сами: короткий конспект, примеры, самопроверка и практика. Работу сдаёте ссылкой — преподаватель проверит.</p>
+      <div class="list">${rows || `<p class="note">Пока нет открытых отработок.</p>`}</div>`;
   }
 
   function theoryTab() {
@@ -386,7 +448,7 @@
     if (toBottom || nearBottom) window.scrollTo(0, document.body.scrollHeight);
   }
 
-  const VIEWS = { tests: testsTab, theory: theoryTab, progress: progressTab, chat: chatTab, profile: profileTab };
+  const VIEWS = { home: homeTab, tests: testsTab, otr: otrTab, theory: theoryTab, progress: progressTab, chat: chatTab, profile: profileTab };
   function show(tab) {
     if (location.hash !== "#" + tab) { history.replaceState(null, "", "#" + tab); }
     route();
@@ -394,8 +456,8 @@
   function route() {
     const who = window.Student.get();
     if (!read(ONBOARDED) || !who.first || !who.last) { slide = 0; return welcome(false); }
-    const tab = (location.hash || "#tests").slice(1);
-    const view = VIEWS[tab] ? tab : "tests";
+    const tab = (location.hash || "#home").slice(1);
+    const view = VIEWS[tab] ? tab : "home";
     clearInterval(chatTimer); chatTimer = null;
     document.body.classList.add("has-tabs");
     renderBar(view);

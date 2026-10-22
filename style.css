@@ -294,7 +294,7 @@ body.has-tabs { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 .tabbar {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: max(10px, env(safe-area-inset-bottom));
   width: min(440px, calc(100% - 20px)); height: 66px; border-radius: 26px; background: var(--white);
-  display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; z-index: 10;
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; align-items: center; z-index: 10;
   box-shadow: 0 6px 22px rgba(20, 20, 20, .1);
 }
 .tabbar[hidden] { display: none; }
@@ -540,3 +540,19 @@ label.li { cursor: pointer; }
   .chat, .composer, .news, #chat-err { max-width: 720px; }
   .msg { max-width: 70%; }
 }
+
+/* меню: «Профиль» только в боковом меню на широком экране */
+@media (max-width: 959px) { .tab.wide-only { display: none; } }
+.tab { min-width: 0; }
+
+/* главная-дашборд */
+.next-wrap { display: flex; flex-direction: column; gap: 8px; }
+a.home-progress { color: var(--ink); text-decoration: none; }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tile {
+  border-radius: 22px; padding: 16px; min-height: 96px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px;
+  color: var(--ink); text-decoration: none;
+}
+.tile b { font-size: 20px; font-weight: 600; letter-spacing: -.02em; }
+.tile span { font-size: 13px; color: var(--ink-2); }
+@media (min-width: 960px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
