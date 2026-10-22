@@ -13,14 +13,13 @@
   const ITEMS = [
     ["perf", "Успеваемость", "admin-journal.html#perf"],
     ["journal", "Журнал", "admin-journal.html#journal"],
-    ["schedule", "Расписание", "admin-journal.html#schedule"],
     ["tests", "Тесты", "admin.html"],
     ["otr", "Отработки", "admin-otr.html"],
     ["chat", "Чат", "admin-chat.html"]
   ];
   const page = location.pathname.split("/").pop() || "admin.html";
   function active() {
-    if (page === "admin-journal.html") return (location.hash || "#perf").slice(1);
+    if (page === "admin-journal.html") return location.hash === "#journal" ? "journal" : "perf";
     return { "admin.html": "tests", "admin-otr.html": "otr", "admin-chat.html": "chat" }[page] || "";
   }
   const svg = id => `<span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[id]}</svg></span>`;

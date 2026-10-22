@@ -21,9 +21,10 @@
 <script src="config.js"></script>
 <script src="admin-nav.js"></script>
 <script>
-// Журнал преподавателя: успеваемость (тесты, теория, отработки, посещаемость), журнал посещений
-// по занятиям и расписание (даты занятий привязаны к темам — парам программы).
-// Ученик, не отмеченный «был» на прошедшем занятии, получает отработку этой темы.
+// Журнал преподавателя: успеваемость (тесты, теория, отработки, посещаемость) и журнал посещений.
+// Журнал идёт по месяцам, по 4 занятия в месяц (можно добавить ещё). У занятия — дата, модуль и тема,
+// их выбирает преподаватель. Отмеченный «не был» получает отработку по теме занятия; она закрывается,
+// когда работу засчитывают в «Отработках».
 // Ученики собираются автоматически по имени и фамилии; опечатки можно объединить, лишних — скрыть.
 (function () {
   const app = document.getElementById("app");
@@ -31,15 +32,16 @@
   const OPEN_TESTS = window.TESTS.filter(t => t.status === "open");
   const THEORY = OPEN_TESTS.filter(t => t.theory);
   const AVATAR = ["yellow", "pink", "lavender", "mint", "peach", "blue"];
-  const VIEWS = [["perf", "Успеваемость"], ["journal", "Журнал"], ["schedule", "Расписание"]];
+  const VIEWS = [["perf", "Успеваемость"], ["journal", "Журнал"]];
+  const MODULE_NAMES = ["Визуальное мышление", "Сетка, цвет, типографика", "Изображение, система, проект №1", "Illustrator и векторное мышление", "Плакат", "Айдентика и итоговый кейс"];
+  const MONTHS = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
 
   let code = "";
   try { code = sessionStorage.getItem(CODE_KEY) || ""; } catch (e) {}
   let view = (location.hash || "#perf").slice(1);
   if (!VIEWS.some(v => v[0] === view)) view = "perf";
   let D = null, openStudent = null, mergeFor = null, busy = false, flash = "";
-  let markDate = null, markPair = null;   // карточка «Отметить занятие»
-  let jModule = null;                     // модуль, открытый в журнале
+  let jMonth = null;   // месяц, открытый в журнале (YYYY-MM-01)
 
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const dShort = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" }).replace(".", "") : "";
@@ -90,11 +92,11 @@
 
   // ---------- сводим данные по ученикам
   let S = [];        // ученики с посчитанной успеваемостью
-  let PAST = [];     // занятия с датой не позже сегодняшней
+  let PAST = [];     // прошедшие занятия, у которых указан модуль
   function prepare() {
-    const att = {};
-    D.attendance.forEach(a => { (att[a.key] = att[a.key] || {})[a.pair] = a.present; });
-    PAST = D.lessons.filter(l => l.lesson_date && l.lesson_date <= D.today);
+    const mk = {};
+    D.marks.forEach(m => { (mk[m.key] = mk[m.key] || {})[m.session] = m.status; });
+    PAST = D.sessions.filter(x => x.session_date && x.session_date <= D.today).sort((a, b) => a.session_date.localeCompare(b.session_date));
     S = D.students.map(s => {
       const k = s.key;
       // тесты: лучший завершённый результат и попытки
@@ -107,23 +109,24 @@
       });
       const theory = {};
       D.theory.filter(t => t.key === k).forEach(t => { theory[t.theory] = t; });
+      const marks = mk[k] || {};
       const subs = D.subs.filter(x => x.key === k);
-      const marks = att[k] || {};
-      // отработки: прошедшие занятия без отметки «был»
-      const assigned = PAST.filter(l => marks[l.pair] !== true).map(l => {
-        const st = l.otr_tasks.map(task => (subs.find(x => x.module === l.otr_module && x.task === task) || {}).status);
+      // отработки: занятия с темой, где ученик отмечен «не был»; статус — по сданным работам
+      const assigned = D.sessions.filter(x => x.pair && marks[x.id] === "absent").map(x => {
+        const l = lessonOf(x.pair);
+        const st = l.otr_tasks.map(task => (subs.find(q => q.module === l.otr_module && q.task === task) || {}).status);
         let status = "todo";
         if (!l.otr_module) status = "none";
-        else if (st.every(x => x === "ok")) status = "ok";
-        else if (st.some(x => x === "redo")) status = "redo";
-        else if (st.every(x => x)) status = "review";
-        else if (st.some(x => x)) status = "part";
-        return { lesson: l, status };
+        else if (st.every(q => q === "ok")) status = "ok";
+        else if (st.some(q => q === "redo")) status = "redo";
+        else if (st.every(q => q)) status = "review";
+        else if (st.some(q => q)) status = "part";
+        return { session: x, lesson: l, status };
       });
-      const present = PAST.filter(l => marks[l.pair] === true).length;
+      const present = PAST.filter(x => marks[x.id] === "present").length;
       const doneTests = OPEN_TESTS.filter(t => tests[t.id] && tests[t.id].best);
       const avg = doneTests.length ? doneTests.reduce((a, t) => a + tests[t.id].best.score / tests[t.id].best.total, 0) / doneTests.length : null;
-      return Object.assign({}, s, { tests, theory, subs, marks, assigned, present, avg, doneTests: doneTests.length });
+      return Object.assign({}, s, { tests, theory, marks, assigned, present, avg, doneTests: doneTests.length });
     });
   }
   const OTR_ST = {
@@ -131,6 +134,10 @@
     redo: ["bad", "на доработку"], ok: ["good", "зачтена"], none: ["plain", "нет материалов"]
   };
   const openOtr = s => s.assigned.filter(a => a.status !== "ok");
+  const lessonOf = pair => D.lessons.find(l => l.pair === pair);
+  // в каком модуле пара программы
+  const modOfPair = p => p <= 4 ? 1 : p <= 10 ? 2 : p <= 16 ? 3 : p <= 24 ? 4 : p <= 28 ? 5 : 6;
+  const modLabel = n => n ? `Модуль ${n} · ${MODULE_NAMES[n - 1]}` : "модуль не указан";
 
   // ---------- общий каркас
   function render() {
@@ -141,12 +148,12 @@
         <span class="grow"></span>
         <button type="button" class="icon-btn" id="refresh" aria-label="Обновить">↻</button>
       </div>
-      <h1>${{ perf: "Успеваемость", journal: "Журнал", schedule: "Расписание" }[view]}</h1>
+      <h1>${{ perf: "Успеваемость", journal: "Журнал" }[view]}</h1>
       ${flash ? `<p class="error">${esc(flash)}</p>` : ""}
       <div id="view"></div>`;
     flash = "";
     document.getElementById("refresh").onclick = () => load();
-    ({ perf: renderPerf, journal: renderJournal, schedule: renderSchedule })[view](document.getElementById("view"));
+    ({ perf: renderPerf, journal: renderJournal })[view](document.getElementById("view"));
     const ts2 = document.querySelector(".table-scroll");
     if (ts2) ts2.scrollLeft = keepX;
     window.scrollTo(0, keepY);
@@ -163,7 +170,6 @@
     const avg = withAvg.length ? Math.round(withAvg.reduce((a, s) => a + s.avg, 0) / withAvg.length * 100) : null;
     const slots = n * PAST.length;
     const attPct = slots ? Math.round(S.reduce((a, s) => a + s.present, 0) / slots * 100) : null;
-    const review = S.reduce((a, s) => a + s.assigned.filter(x => x.status === "review" || x.status === "part").length, 0);
     const owe = S.reduce((a, s) => a + openOtr(s).length, 0);
 
     const head = OPEN_TESTS.map(t => `<th class="num" title="${esc(t.title)}"><span class="dot-h" style="background:var(--${t.color})"></span>${esc(t.title)}</th>`).join("");
@@ -189,12 +195,12 @@
         <div class="tile" style="background:var(--mint)"><b>${n}</b><span>учеников</span></div>
         <div class="tile" style="background:var(--lavender)"><b>${avg === null ? "—" : avg + "%"}</b><span>средний результат тестов</span></div>
         <div class="tile" style="background:var(--yellow)"><b>${attPct === null ? "—" : attPct + "%"}</b><span>посещаемость</span></div>
-        <div class="tile" style="background:var(--pink)"><b>${owe}</b><span>отработок не закрыто${review ? ` · ${review} ждут проверки` : ""}</span></div>
+        <div class="tile" style="background:var(--pink)"><b>${owe}</b><span>отработок не закрыто${S.reduce((a, s) => a + s.assigned.filter(x => x.status === "review" || x.status === "part").length, 0) ? " · есть на проверке" : ""}</span></div>
       </div>
       ${n ? `<div class="table-scroll"><table class="perf">
         <thead><tr><th>Ученик</th>${head}<th class="num">Был(а)</th><th class="num">Отработки</th></tr></thead>
         <tbody>${rows}</tbody></table></div>
-        <p class="note">Ячейка теста — лучший завершённый результат. ◉ — ученик открывал теорию к этому тесту, ○ — не открывал. «Был(а)» — сколько прошедших занятий отмечено. Нажмите на ученика, чтобы увидеть подробности.</p>
+        <p class="note">Ячейка теста — лучший завершённый результат. ◉ — ученик открывал теорию к этому тесту, ○ — не открывал. «Был(а)» — на скольких прошедших занятиях ученик отмечен «был». Нажмите на ученика, чтобы увидеть подробности.</p>
         <div id="detail"></div>`
       : `<div class="card yellow"><h2>Пока нет учеников</h2><p>Ученики появятся здесь автоматически, когда пройдут тест, откроют теорию, сдадут отработку или напишут в чат.</p></div>`}`;
     el.querySelectorAll("tr.srow").forEach(tr => tr.addEventListener("click", () => {
@@ -214,7 +220,7 @@
         ${r && r.best ? `<span class="pill ${pctCls(r.best.score / r.best.total)}">${r.best.score} / ${r.best.total}</span>` : ""}</div>`;
     }).join("");
     const otr = s.assigned.length ? s.assigned.map(a => `<div class="li"><span class="sw" style="background:var(--cream)">${pairNo(a.lesson.pair)}</span>
-        <div class="grow">${esc(a.lesson.title)}<small>пропуск ${dLong(a.lesson.lesson_date)}${a.lesson.otr_module ? "" : " · отработки к этой теме пока нет"}</small></div>
+        <div class="grow">${esc(a.lesson.title)}<small>пропуск ${dLong(a.session.session_date)}${a.lesson.otr_module ? "" : " · материалов отработки пока нет"}</small></div>
         <span class="pill ${OTR_ST[a.status][0]}">${OTR_ST[a.status][1]}</span></div>`).join("")
       : `<p class="note">Пропусков нет — отработки не назначены.</p>`;
     const others = S.filter(x => x.key !== s.key);
@@ -247,149 +253,88 @@
     const h = el.querySelector("#hide"); if (h) h.onclick = () => { openStudent = null; call("journal_hide", { p_key: s.key, p_hidden: true }); };
   }
 
-  // ---------- журнал посещений: ученики × занятия с датами
-  // ---------- отметить занятие: дата → тема → кто был
-  const MODULES = () => [...new Set(D.lessons.map(l => l.module))];
-  // модуль по умолчанию: где стоит сегодняшнее или последнее прошедшее занятие, иначе первый с пустыми датами
-  function defaultModule() {
-    const past = D.lessons.filter(l => l.lesson_date && l.lesson_date <= D.today).sort((a, b) => b.lesson_date.localeCompare(a.lesson_date))[0];
-    if (past) return past.module;
-    return (D.lessons.find(l => !l.lesson_date) || D.lessons[0]).module;
-  }
-  function markCard() {
-    if (!markDate) markDate = D.today;
-    const inMod = D.lessons.filter(l => l.module === jModule);
-    if (!markPair || !inMod.some(l => l.pair === markPair)) {
-      // по умолчанию: тема модуля с этой датой, иначе первая тема модуля без даты
-      const onDate = inMod.find(l => l.lesson_date === markDate);
-      markPair = (onDate || inMod.find(l => !l.lesson_date) || inMod[0]).pair;
-    }
-    const L = D.lessons.find(l => l.pair === markPair);
-    const bound = L.lesson_date === markDate;
-    const opts = inMod.map(l => `<option value="${l.pair}" ${l.pair === markPair ? "selected" : ""}>${pairNo(l.pair)} · ${esc(l.title)}${l.lesson_date ? " — " + dShort(l.lesson_date) : ""}</option>`).join("");
-    const bindBtn = bound ? `<span class="pill good">тема привязана к дате</span>`
-      : `<button type="button" class="btn small" id="m-bind">${L.lesson_date ? "Перенести тему на " + dShort(markDate) : "Привязать тему к " + dShort(markDate)}</button>
-         ${L.lesson_date ? `<span class="note ink">Сейчас у этой темы стоит ${dLong(L.lesson_date)}.</span>` : ""}`;
-    const cnt = S.filter(st => st.marks[markPair] === true).length;
-    const roster = S.map(st => {
-      const v = bound ? st.marks[markPair] : undefined;
-      return `<div class="li mark-row">
-        <span class="avatar sm" style="background:var(--${colorOf(st.key)})">${esc((st.first[0] || "") + (st.last[0] || "")).toUpperCase()}</span>
-        <div class="grow">${esc(st.last)} ${esc(st.first)}${v === undefined && bound && markDate <= D.today ? `<small>не отмечен — получит отработку</small>` : ""}</div>
-        <div class="seg" role="group" aria-label="${esc(st.last + " " + st.first)}">
-          <button type="button" class="seg-b ${v === true ? "on was" : ""}" data-mk="${esc(st.key)}" data-v="1" ${bound ? "" : "disabled"}>Был</button>
-          <button type="button" class="seg-b ${v === false ? "on miss" : ""}" data-mk="${esc(st.key)}" data-v="0" ${bound ? "" : "disabled"}>Не был</button>
-        </div></div>`;
-    }).join("");
-    return `<section class="card lavender mark-card">
-      <h2>Отметить занятие</h2>
-      <div class="mark-fields">
-        <label class="field" for="m-date">Дата<input type="date" id="m-date" class="date-in" value="${markDate}"></label>
-        <label class="field grow" for="m-pair">Тема модуля<select id="m-pair">${opts}</select></label>
-      </div>
-      <div class="row">${bindBtn}</div>
-      ${S.length ? `<div class="row"><h3 class="grow">Кто был${bound ? ` · ${cnt} из ${S.length}` : ""}</h3>${bound ? `<button type="button" class="btn small ghost" id="m-all">Все были</button>` : ""}</div>
-        ${bound ? "" : `<p class="note ink">Сначала привяжите тему к дате — потом отметьте присутствие.</p>`}
-        <div class="list">${roster}</div>`
-      : `<p class="note ink">Ученики появятся автоматически, когда начнут проходить тесты или откроют теорию.</p>`}
-    </section>`;
-  }
-  function bindMark(el) {
-    el.querySelector("#m-date").addEventListener("change", e => { markDate = e.target.value || D.today; markPair = null; render(); });
-    el.querySelector("#m-pair").addEventListener("change", e => { markPair = Number(e.target.value); render(); });
-    const b = el.querySelector("#m-bind");
-    if (b) b.onclick = () => call("journal_set_date", { p_pair: markPair, p_date: markDate });
-    el.querySelectorAll("[data-mk]").forEach(x => x.addEventListener("click", () => {
-      if (busy) return;
-      const st = S.find(q => q.key === x.dataset.mk), want = x.dataset.v === "1";
-      const next = st.marks[markPair] === want ? null : want;   // повторное нажатие снимает отметку
-      if (next === null) delete st.marks[markPair]; else st.marks[markPair] = next;
-      call("journal_set_present", { p_pair: markPair, p_key: st.key, p_present: next });
-    }));
-    const all = el.querySelector("#m-all");
-    if (all) all.onclick = async () => {
-      if (busy) return;
-      busy = true; all.textContent = "Сохраняем…";
-      for (const st of S) if (st.marks[markPair] !== true) {
-        try { await window.quizRpc("journal_set_present", { p_code: code, p_pair: markPair, p_key: st.key, p_present: true }); } catch (e) { flash = "Часть отметок не сохранилась. Проверьте интернет."; }
-      }
-      busy = false; load(true);
-    };
-  }
+  // ---------- журнал: месяц → занятия (дата + модуль) → отметки учеников
+  const ST = {
+    present: ["was", "✓", "был(а)"],
+    absent: ["miss", "Н", "не был(а) — назначена отработка по теме"],
+    made_up: ["was", "✓", "был(а)"]
+  };
+  const NEXT = { undefined: "present", present: "absent", absent: null, made_up: "absent" };
+  const monthKey = iso => iso.slice(0, 7) + "-01";
+  function monthName(m) { const d = new Date(m + "T00:00:00"); const n = MONTHS[d.getMonth()]; return n[0].toUpperCase() + n.slice(1); }
 
   function renderJournal(el) {
-    if (!jModule) jModule = defaultModule();
-    const lessons = D.lessons.filter(l => l.module === jModule);
-    const chips = MODULES().map(m => `<button type="button" class="chip ${m === jModule ? "dark" : ""}" data-mod="${esc(m)}">${esc(m)}</button>`).join("");
-    const head = lessons.map(l => `<th class="lesson ${l.lesson_date && l.lesson_date > D.today ? "future" : ""} ${l.lesson_date ? "" : "nodate"}">
-        <small>${pairNo(l.pair)}</small><span class="lt" title="${esc(l.title)}">${esc(l.title)}</span>
-        <input type="date" class="date-in sm" data-date="${l.pair}" value="${l.lesson_date || ""}" aria-label="Дата пары ${pairNo(l.pair)} «${esc(l.title)}»">
+    const months = [...new Set(D.sessions.map(x => x.month))].sort();
+    if (!jMonth || !months.includes(jMonth)) jMonth = months.includes(monthKey(D.today)) ? monthKey(D.today) : months[months.length - 1];
+    const sess = D.sessions.filter(x => x.month === jMonth).sort((a, b) => a.slot - b.slot);
+    const chips = months.map(m => `<button type="button" class="chip ${m === jMonth ? "dark" : ""}" data-month="${m}">${monthName(m)}</button>`).join("");
+    const modOpts = cur => `<option value="">модуль…</option>` + MODULE_NAMES.map((n, i) => `<option value="${i + 1}" ${cur === i + 1 ? "selected" : ""}>Модуль ${i + 1}</option>`).join("");
+    const head = sess.map((x, i) => `<th class="lesson ${x.session_date && x.session_date > D.today ? "future" : ""} ${x.session_date ? "" : "nodate"}">
+        <small>Занятие ${i + 1}</small>
+        <input type="date" class="date-in sm" data-date="${x.id}" value="${x.session_date || ""}" aria-label="Дата занятия ${i + 1}">
+        <select class="mod-in" data-mod-of="${x.id}" aria-label="Модуль занятия ${i + 1}" title="${x.module ? esc(modLabel(x.module)) : "Выберите модуль"}">${modOpts(x.module)}</select>
+        <select class="mod-in topic-in" data-topic-of="${x.id}" aria-label="Тема занятия ${i + 1}" ${x.module ? "" : "disabled"} title="${x.pair ? esc(lessonOf(x.pair).title) : "Выберите тему"}">
+          <option value="">${x.module ? "тема…" : "сначала модуль"}</option>
+          ${D.lessons.filter(l => modOfPair(l.pair) === x.module).map(l => `<option value="${l.pair}" ${x.pair === l.pair ? "selected" : ""}>${pairNo(l.pair)} · ${esc(l.title)}</option>`).join("")}
+        </select>
+        ${x.slot > 4 ? `<button type="button" class="linkbtn small-all" data-del-session="${x.id}">убрать</button>` : ""}
       </th>`).join("");
     const rows = S.map(s => `<tr><td class="sticky"><span class="who"><span class="avatar sm" style="background:var(--${colorOf(s.key)})">${esc((s.first[0] || "") + (s.last[0] || "")).toUpperCase()}</span>${esc(s.last)} ${esc(s.first)}</span></td>
-      ${lessons.map(l => {
-        if (!l.lesson_date) return `<td class="mark"><span class="att off" title="Сначала поставьте дату">·</span></td>`;
-        const v = s.marks[l.pair], past = l.lesson_date <= D.today;
-        const st = v === true ? ["was", "✓", "был(а)"] : v === false ? ["miss", "Н", "не был(а) — отработка"] : past ? ["owe", "О", "не отмечен — назначена отработка"] : ["none", "", "не отмечен"];
-        return `<td class="mark"><button type="button" class="att ${st[0]}" data-pair="${l.pair}" data-key="${esc(s.key)}" title="${esc(st[2])}" aria-label="${esc(s.last + " " + s.first + ", пара " + pairNo(l.pair) + ": " + st[2])}">${st[1]}</button></td>`;
+      ${sess.map(x => {
+        if (!x.session_date) return `<td class="mark"><span class="att off" title="Сначала поставьте дату">·</span></td>`;
+        const v = s.marks[x.id];
+        const st = v ? ST[v] : ["none", "", "не отмечен"];
+        return `<td class="mark"><button type="button" class="att ${st[0]}" data-s="${x.id}" data-key="${esc(s.key)}" title="${esc(st[2])}" aria-label="${esc(s.last + " " + s.first + ", " + (dShort(x.session_date)) + ": " + st[2])}">${st[1]}</button></td>`;
       }).join("")}</tr>`).join("");
-    const totals = lessons.map(l => `<td class="mark total">${l.lesson_date ? S.filter(s => s.marks[l.pair] === true).length : ""}</td>`).join("");
-    const allBtns = lessons.map(l => `<td class="mark">${l.lesson_date && S.length ? `<button type="button" class="linkbtn small-all" data-all="${l.pair}" title="Отметить всех присутствующими">все</button>` : ""}</td>`).join("");
+    const totals = sess.map(x => `<td class="mark total">${x.session_date ? S.filter(s => s.marks[x.id] === "present").length : ""}</td>`).join("");
+    const allBtns = sess.map(x => `<td class="mark">${x.session_date && S.length ? `<button type="button" class="linkbtn small-all" data-all="${x.id}">все были</button>` : ""}</td>`).join("");
     el.innerHTML = `
-      <div class="chips mod-chips" role="tablist" aria-label="Модуль">${chips}</div>
-      ${markCard()}
-      <h2 class="sub">${esc(jModule)}</h2>
-      <p class="muted">Поставьте дату в заголовке столбца — так пара привязывается к дню занятия. Потом нажимайте на клетки: <b>✓ был</b> → <b>Н не был</b> → пусто. Не отмеченный «был» на прошедшем занятии получает отработку этой темы (<b>О</b>) и видит её у себя на главной.</p>
-      ${S.length ? `<div class="table-scroll"><table class="journal-table">
-        <thead><tr><th class="sticky">Ученик</th>${head}</tr></thead>
-        <tbody>${rows}<tr><td class="sticky note">Присутствовали</td>${totals}</tr><tr><td class="sticky note">Отметить всех</td>${allBtns}</tr></tbody></table></div>
-      <div class="row"><span class="legend"><i class="att was">✓</i> был(а)</span><span class="legend"><i class="att miss">Н</i> не был(а)</span><span class="legend"><i class="att owe">О</i> не отмечен — отработка</span><span class="legend"><i class="att off">·</i> нет даты</span></div>`
-      : `<div class="card yellow"><h2>Пока нет учеников</h2><p>Даты можно поставить уже сейчас. Ученики появятся автоматически, когда начнут проходить тесты или откроют теорию.</p></div>
-         <div class="table-scroll"><table class="journal-table"><thead><tr><th class="sticky">Даты</th>${head}</tr></thead></table></div>`}`;
-    bindMark(el);
-    el.querySelectorAll("[data-mod]").forEach(b => b.addEventListener("click", () => { jModule = b.dataset.mod; markPair = null; render(); }));
+      <div class="chips mod-chips" role="tablist" aria-label="Месяц">${chips}</div>
+      <p class="muted">Для каждого занятия поставьте дату, выберите модуль и тему. Потом нажимайте на клетки: <b>✓ был</b> → <b>Н не был</b> → пусто. Отмеченный «не был» получает отработку по теме занятия и видит её у себя на главной. Отработка закрывается, когда вы засчитываете сданную работу в «Отработках».</p>
+      <div class="table-scroll"><table class="journal-table">
+        <thead><tr><th class="sticky">${monthName(jMonth)}</th>${head}</tr></thead>
+        ${S.length ? `<tbody>${rows}<tr><td class="sticky note">Присутствовали</td>${totals}</tr><tr><td class="sticky note">Отметить всех</td>${allBtns}</tr></tbody>` : ""}
+      </table></div>
+      ${S.length ? "" : `<p class="note">Учеников пока нет — они появятся автоматически, когда начнут проходить тесты или откроют теорию. Даты и модули можно поставить уже сейчас.</p>`}
+      <div class="row">
+        <button type="button" class="btn small ghost" id="add-session">+ Ещё занятие в ${monthName(jMonth).toLowerCase().replace(/ь$/, "е").replace(/й$/, "е")}</button>
+        <span class="legend"><i class="att was">✓</i> был(а)</span><span class="legend"><i class="att miss">Н</i> не был(а) — отработка</span>
+      </div>`;
+    const sessOf = id => D.sessions.find(x => x.id === id);
+    el.querySelectorAll("[data-month]").forEach(b => b.addEventListener("click", () => { jMonth = b.dataset.month; render(); }));
     el.querySelectorAll("input[data-date]").forEach(inp => inp.addEventListener("change", () => {
-      call("journal_set_date", { p_pair: Number(inp.dataset.date), p_date: inp.value || null });
+      const x = sessOf(Number(inp.dataset.date));
+      call("journal_session_set", { p_id: x.id, p_date: inp.value || null, p_module: x.module, p_pair: x.pair });
     }));
+    el.querySelectorAll("select[data-mod-of]").forEach(sel => sel.addEventListener("change", () => {
+      const x = sessOf(Number(sel.dataset.modOf));
+      const mod = sel.value ? Number(sel.value) : null;
+      // при смене модуля тема из другого модуля сбрасывается
+      call("journal_session_set", { p_id: x.id, p_date: x.session_date, p_module: mod, p_pair: x.pair && modOfPair(x.pair) === mod ? x.pair : null });
+    }));
+    el.querySelectorAll("select[data-topic-of]").forEach(sel => sel.addEventListener("change", () => {
+      const x = sessOf(Number(sel.dataset.topicOf));
+      call("journal_session_set", { p_id: x.id, p_date: x.session_date, p_module: x.module, p_pair: sel.value ? Number(sel.value) : null });
+    }));
+    el.querySelectorAll("[data-del-session]").forEach(b => b.addEventListener("click", () => call("journal_session_delete", { p_id: Number(b.dataset.delSession) })));
+    el.querySelector("#add-session").onclick = () => call("journal_session_add", { p_month: jMonth });
     el.querySelectorAll("button.att").forEach(b => b.addEventListener("click", () => {
       if (busy) return;
-      const pair = Number(b.dataset.pair), key = b.dataset.key;
-      const s = S.find(x => x.key === key), v = s.marks[pair];
-      const next = v === true ? false : v === false ? null : true;
-      // сразу показываем новое состояние, потом сохраняем
-      if (next === null) delete s.marks[pair]; else s.marks[pair] = next;
-      b.className = "att " + (next === true ? "was" : next === false ? "miss" : "none");
-      b.textContent = next === true ? "✓" : next === false ? "Н" : "";
-      call("journal_set_present", { p_pair: pair, p_key: key, p_present: next });
+      const sid = Number(b.dataset.s), key = b.dataset.key, s = S.find(x => x.key === key);
+      const next = NEXT[s.marks[sid]];
+      if (next) s.marks[sid] = next; else delete s.marks[sid];
+      const st = next ? ST[next] : ["none", "", ""];
+      b.className = "att " + st[0]; b.textContent = st[1];
+      call("journal_mark", { p_session: sid, p_key: key, p_status: next });
     }));
     el.querySelectorAll("[data-all]").forEach(b => b.addEventListener("click", async () => {
       if (busy) return;
-      const pair = Number(b.dataset.all);
+      const sid = Number(b.dataset.all);
       busy = true; b.textContent = "…";
-      for (const s of S) if (s.marks[pair] !== true) {
-        try { await window.quizRpc("journal_set_present", { p_code: code, p_pair: pair, p_key: s.key, p_present: true }); } catch (e) { flash = "Часть отметок не сохранилась. Проверьте интернет."; }
+      for (const s of S) if (s.marks[sid] !== "present") {
+        try { await window.quizRpc("journal_mark", { p_code: code, p_session: sid, p_key: s.key, p_status: "present" }); } catch (e) { flash = "Часть отметок не сохранилась. Проверьте интернет."; }
       }
       busy = false; load(true);
-    }));
-  }
-
-  // ---------- расписание: дата для каждой пары
-  function renderSchedule(el) {
-    const otrTitle = id => ((window.OTRABOTKI || []).find(o => o.id === id) || {}).title;
-    const modules = [...new Set(D.lessons.map(l => l.module))];
-    const row = l => {
-      const state = !l.lesson_date ? "" : l.lesson_date > D.today ? `<span class="pill plain">впереди</span>` : `<span class="pill good">прошло</span>`;
-      return `<div class="li sched">
-        <span class="sw" style="background:var(--cream)">${pairNo(l.pair)}</span>
-        <div class="grow">${esc(l.title)}<small>${l.otr_module ? "отработка: " + esc(otrTitle(l.otr_module) || l.otr_module) : "отработки к этой теме пока нет"}</small></div>
-        ${state}
-        <input type="date" class="date-in" data-pair="${l.pair}" value="${l.lesson_date || ""}" aria-label="Дата пары ${pairNo(l.pair)}">
-      </div>`;
-    };
-    el.innerHTML = `
-      <p class="muted">Поставьте дату каждой пары. Дата привязывает занятие к теме: по ней журнал понимает, какое занятие прошло и какую отработку назначить пропустившим.</p>
-      ${modules.map(m => `<h2 class="sub">${esc(m)}</h2><div class="list">${D.lessons.filter(l => l.module === m).map(row).join("")}</div>`).join("")}`;
-    el.querySelectorAll("input.date-in").forEach(inp => inp.addEventListener("change", () => {
-      call("journal_set_date", { p_pair: Number(inp.dataset.pair), p_date: inp.value || null });
     }));
   }
 

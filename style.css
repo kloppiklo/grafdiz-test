@@ -646,3 +646,5 @@ table.journal-table th.lesson.nodate .date-in { outline: 2px dashed var(--peach)
 .linkbtn.small-all { font-size: 12px; padding: 4px; text-decoration: underline; }
 /* промежутки между блоками внутри разделов журнала */
 .journal #view { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.mod-in { font: inherit; font-size: 12px; color: var(--ink); background: var(--cream); border: 0; border-radius: 999px; padding: 6px 8px; width: 100%; max-width: 140px; margin-top: 4px; }
+.mod-in:disabled { opacity: .5; }
