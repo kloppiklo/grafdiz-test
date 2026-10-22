@@ -40,7 +40,7 @@
   try { code = sessionStorage.getItem(CODE_KEY) || ""; } catch (e) {}
   let view = (location.hash || "#perf").slice(1);
   if (!VIEWS.some(v => v[0] === view)) view = "perf";
-  let D = null, openStudent = null, mergeFor = null, busy = false, flash = "";
+  let D = null, openStudent = null, mergeFor = null, renameFor = null, busy = false, flash = "";
   let jMonth = null;   // месяц, открытый в журнале (YYYY-MM-01)
 
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -232,19 +232,40 @@
           <div class="col"><h3>Тесты и теория</h3><div class="list">${tests}</div></div>
           <div class="col"><h3>Отработки</h3><div class="list">${otr}</div></div>
         </div>
+        ${renameFor === s.key ? `
+        <form class="row rename" id="rename" novalidate>
+          <label class="field grow" for="rn-first">Имя<input type="text" id="rn-first" maxlength="60" value="${esc(s.first)}"></label>
+          <label class="field grow" for="rn-last">Фамилия<input type="text" id="rn-last" maxlength="60" value="${esc(s.last)}"></label>
+          <button type="submit" class="btn small">Сохранить</button>
+          <button type="button" class="btn small ghost" id="rn-no">Отмена</button>
+        </form>
+        <p class="note ink">Новое имя увидите вы — в журнале, тестах и отработках. У ученика в приложении останется имя, которое он ввёл сам.</p>` : ""}
         <div class="row">
           ${mergeFor === s.key ? `
             <label class="field grow" for="merge-into">Это тот же ученик, что и…
               <select id="merge-into">${others.map(o => `<option value="${esc(o.key)}">${esc(o.last)} ${esc(o.first)}</option>`).join("")}</select></label>
             <button type="button" class="btn small" id="merge-yes">Объединить</button>
             <button type="button" class="btn small ghost" id="merge-no">Отмена</button>`
-          : `<button type="button" class="btn small ghost" id="merge">Объединить с другим именем</button>
+          : `<button type="button" class="btn small ghost" id="rename-open">Переименовать</button>
+             <button type="button" class="btn small ghost" id="merge">Объединить с другим именем</button>
              <button type="button" class="btn small ghost" id="hide">Скрыть из журнала</button>`}
         </div>
         ${mergeFor === s.key ? `<p class="note ink">Все результаты и отметки «${esc(nameOf(s))}» перейдут к выбранному ученику. Пригодится, если имя написали по-разному.</p>` : ""}
       </section>`;
-    el.querySelector("#d-close").onclick = () => { openStudent = null; render(); };
-    const m = el.querySelector("#merge"); if (m) m.onclick = () => { mergeFor = s.key; render(); };
+    el.querySelector("#d-close").onclick = () => { openStudent = null; renameFor = null; render(); };
+    const ro = el.querySelector("#rename-open"); if (ro) ro.onclick = () => { renameFor = s.key; mergeFor = null; render(); };
+    const rf = el.querySelector("#rename");
+    if (rf) {
+      el.querySelector("#rn-no").onclick = () => { renameFor = null; render(); };
+      rf.addEventListener("submit", e => {
+        e.preventDefault();
+        const first = el.querySelector("#rn-first").value.trim(), last = el.querySelector("#rn-last").value.trim();
+        if (!first || !last) { flash = "Впишите и имя, и фамилию."; render(); return; }
+        renameFor = null;
+        call("journal_rename", { p_key: s.key, p_first_name: first, p_last_name: last });
+      });
+    }
+    const m = el.querySelector("#merge"); if (m) m.onclick = () => { mergeFor = s.key; renameFor = null; render(); };
     const mn = el.querySelector("#merge-no"); if (mn) mn.onclick = () => { mergeFor = null; render(); };
     const my = el.querySelector("#merge-yes"); if (my) my.onclick = () => {
       const into = el.querySelector("#merge-into").value; mergeFor = null; openStudent = into;
