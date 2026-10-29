@@ -352,7 +352,7 @@
     const OTR = (window.OTRABOTKI || []).filter(o => o.status === "open");
     const isPdf = h => /\.pdf$/i.test(h);
     const KIND = {
-      deck: ["Презентация", "▶"], workbook: ["Рабочая тетрадь", "↓"], task: ["Задание для группы", "✦"],
+      deck: ["Презентация", "▶"], workbook: ["Рабочая тетрадь", "↓"], task: ["Задание для группы", "✦"], practice: ["Практика", "✎"],
       otr: ["Отработка", "↺"], test: ["Тест", "✓"]
     };
     const row = (kind, title, note, href, color) => `

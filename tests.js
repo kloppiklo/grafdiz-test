@@ -1,7 +1,7 @@
 // Список тестов курса. Чтобы добавить тест: файл questions/<id>.js,
 // строка здесь со status: "open" и ключ ответов в базе для этого id.
 // theory — необязательная ссылка на презентацию с теорией (папка materials/).
-// extras — дополнительные материалы для вкладки «Теория»: kind = workbook (рабочая тетрадь), task (задание для группы),
+// extras — дополнительные материалы для вкладки «Теория»: kind = workbook (рабочая тетрадь), task (задание для группы), practice (практика пары),
 //   deck (ещё одна презентация: id + src, открывается через theory.html?t=<тема>&d=<id>).
 // otr — id отработки этой темы (см. OTRABOTKI). Модуль берётся из подписи module: «Модуль N · …».
 window.TESTS = [
@@ -22,7 +22,8 @@ window.TESTS = [
     topics: ["Свет и глаз", "Цветовой круг", "Схемы", "Модели", "Психология"],
     theory: "materials/color.html",
     extras: [
-      { kind: "deck", id: "comm", title: "Цвет как коммуникация", note: "пара 08: разминка и теория", href: "theory.html?t=color&d=comm", src: "materials/color-communication.html", short: "Пара 08" },
+      { kind: "deck", id: "comm", title: "Цвет как коммуникация", note: "пара 08: разминка, теория, приёмы Figma", href: "theory.html?t=color&d=comm", src: "materials/color-communication.html", short: "Пара 08" },
+      { kind: "practice", title: "Один объект — три сообщения", note: "пара 08: серия из 3 плакатов, жеребьёвка", href: "task-color-message.html", short: "Практика 08" },
       { kind: "workbook", title: "Рабочая тетрадь «Цвет»", note: "PDF для печати, 12 страниц", href: "materials/color-workbook.pdf" },
       { kind: "task", title: "Цветовое агентство", note: "работа в группах в Figma", href: "group-color.html", short: "Задание" }
     ], otr: "color"
