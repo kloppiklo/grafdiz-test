@@ -616,6 +616,7 @@ td.mark.total { font-weight: 600; font-variant-numeric: tabular-nums; }
 .admin-nav .nav-role { display: none; }
 .admin-nav .nav-sp { display: none; }
 @media (max-width: 959px) { .admin-nav .tab { font-size: 10px; } }
+@media (max-width: 420px) { .admin-nav .tab { font-size: 9px; letter-spacing: -.02em; } }
 @media (min-width: 960px) {
   .admin-nav .nav-role { display: block; margin: -6px 0 10px 12px; font-size: 13px; color: var(--ink-2); }
   .admin-nav .nav-sp { display: block; flex: 1 1 auto; }

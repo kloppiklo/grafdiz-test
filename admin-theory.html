@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f0e2">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="robots" content="noindex">
+<title>Теория · преподаватель</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="style.css?v=23">
+<style>
+  .th { display: flex; flex-direction: column; gap: 28px; }
+  .th .topic h4 { margin: 10px 0 0 4px; }
+  .th .empty { padding: 0 4px; }
+</style>
+</head>
+<body>
+<main class="wrap admin" id="app"></main>
+
+<script src="config.js"></script>
+<script src="admin-nav.js"></script>
+<script>
+// Материалы для преподавателя: презентации с заметками, файлы Figma, страницы заданий, тесты.
+// Чтобы добавить материал — строка в THEORY ниже (kind: deck, slides, figma, page, pdf, otr, test, results).
+(function () {
+  const app = document.getElementById("app");
+  const CODE_KEY = "quiz_admin_code";
+  const FIG_AGENCY = "https://www.figma.com/design/24IIET6qwiL0BZuv8FBgr2";
+
+  const THEORY = [
+    { n: 1, title: "Визуальное мышление", pairs: "пары 01–04", color: "yellow", blocks: [
+      { title: "Пары 01–04", empty: "Презентации и файлы Figma к этим парам пока не добавлены.", items: [
+        ["otr", "Отработка «Визуальное мышление»", "задания для пропустивших", "otrabotka.html?m=m1"],
+        ["test", "Тест «Визуальное мышление»", "10 вопросов", "test.html?t=module1"],
+        ["results", "Результаты теста", "", "admin.html?t=module1"]
+      ] }
+    ] },
+    { n: 2, title: "Сетка, цвет, типографика", pairs: "пары 05–11", color: "pink", blocks: [
+      { title: "Пара 05 · Модульная сетка", items: [
+        ["deck", "Модульная сетка", "презентация в Figma, с заметками", "https://www.figma.com/deck/MkFb5utfGs86Hi7VZTMC6T"],
+        ["slides", "Модульная сетка", "слайды, которые видят ученики", "theory.html?t=grid"],
+        ["figma", "Файл «Сетки»", "задание «Тушёнка» на сетке 5 × 6", "https://www.figma.com/design/c7h4iXI0Jc2XF4Gd3XPXKy?node-id=2-9"],
+        ["otr", "Отработка «Модульная сетка»", "", "otrabotka.html?m=grid"],
+        ["test", "Тест «Модульная сетка»", "12 вопросов", "test.html?t=grid"],
+        ["results", "Результаты теста", "", "admin.html?t=grid"]
+      ] },
+      { title: "Пары 06–07 · Основы цвета", items: [
+        ["deck", "Цвет в дизайне", "презентация с заметками к слайдам", "materials/teacher/color.html"],
+        ["slides", "Цвет в дизайне", "слайды, которые видят ученики", "theory.html?t=color"],
+        ["figma", "«Цветовое агентство»", "шаблон для групп, страница «Цветовое агентство»", FIG_AGENCY + "?node-id=0-1"],
+        ["page", "Задание «Цветовое агентство»", "страница задания для групп", "group-color.html"],
+        ["pdf", "Рабочая тетрадь «Цвет»", "PDF для печати, 12 страниц", "materials/color-workbook.pdf"]
+      ] },
+      { title: "Пара 08 · Цвет как коммуникация", items: [
+        ["deck", "Цвет как коммуникация", "презентация с заметками: разминка, теория, Figma, практика", "materials/teacher/color-communication.html"],
+        ["slides", "Цвет как коммуникация", "слайды, которые видят ученики", "theory.html?t=color&d=comm"],
+        ["figma", "Страница «Пара 08»", "весь шаблон пары в файле «Цветовое агентство»", FIG_AGENCY + "?node-id=9-110"],
+        ["figma", "Вместе: карточка товара", "ваш экран, 4 шага на одной карточке", FIG_AGENCY + "?node-id=9-122"],
+        ["figma", "Задание «Один объект — три сообщения»", "правила, подсказки с палитрами, шаги", FIG_AGENCY + "?node-id=13-110"],
+        ["figma", "Строки учеников", "карточка + 3 плаката + бонус", FIG_AGENCY + "?node-id=9-195"],
+        ["page", "Практика «Один объект — три сообщения»", "страница с жеребьёвкой для учеников", "task-color-message.html"]
+      ] },
+      { title: "Цвет · вся тема", items: [
+        ["otr", "Отработка «Колористика»", "", "otrabotka.html?m=color"],
+        ["test", "Тест «Цвет»", "12 вопросов", "test.html?t=color"],
+        ["results", "Результаты теста", "", "admin.html?t=color"]
+      ] }
+    ] }
+  ];
+  const KIND = {
+    deck: ["Презентация · для вас", "▶"], slides: ["Слайды учеников", "▢"], figma: ["Figma", "✦"], page: ["Страница задания", "✎"],
+    pdf: ["PDF", "↓"], otr: ["Отработка", "↺"], test: ["Тест", "✓"], results: ["Результаты", "≡"]
+  };
+
+  let code = "";
+  try { code = sessionStorage.getItem(CODE_KEY) || ""; } catch (e) {}
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const external = h => /^https?:|\.pdf$/i.test(h);
+
+  function login(errText) {
+    app.innerHTML = `
+      <div class="topbar"><span class="chip">Для преподавателя</span></div>
+      <h1>Теория</h1>
+      <form class="card lavender login" id="login" novalidate>
+        <label class="field" for="code">Код преподавателя
+          <input type="password" id="code" autocomplete="current-password" required>
+        </label>
+        <p class="error" ${errText ? "" : "hidden"}>${esc(errText || "")}</p>
+        <button class="btn block" type="submit">Открыть <span class="arr">→</span></button>
+      </form>`;
+    document.getElementById("login").addEventListener("submit", e => {
+      e.preventDefault();
+      code = document.getElementById("code").value.trim();
+      load();
+    });
+  }
+
+  async function load() {
+    try {
+      await window.quizRpc("journal_get", { p_code: code });
+      try { sessionStorage.setItem(CODE_KEY, code); } catch (e) {}
+      render();
+    } catch (e) {
+      try { sessionStorage.removeItem(CODE_KEY); } catch (e2) {}
+      login(e && /code/i.test(e.message) ? "Код не подошёл. Проверьте его и попробуйте ещё раз." : "Не удалось проверить код. Проверьте интернет и попробуйте ещё раз.");
+    }
+  }
+
+  function row([kind, title, note, href], color) {
+    return `
+      <a class="li mat" href="${esc(href)}" ${external(href) ? 'target="_blank" rel="noopener"' : ""}>
+        <span class="sw" style="background:var(--${color})">${KIND[kind][1]}</span>
+        <div class="grow"><span class="kind">${KIND[kind][0]}</span>${esc(title)}${note ? `<small>${esc(note)}</small>` : ""}</div>
+        <span class="go">${external(href) ? "↗" : "›"}</span></a>`;
+  }
+
+  function render() {
+    app.innerHTML = `
+      <div class="topbar"><span class="chip">Для преподавателя</span></div>
+      <h1>Теория</h1>
+      <p class="muted">Презентации с заметками к слайдам, файлы Figma и страницы заданий по парам. Слайды учеников — те же презентации без заметок, как их видят в приложении.</p>
+      <div class="th">${THEORY.map(m => `
+        <section class="module-block">
+          <div class="module-head" style="background:var(--${m.color})">
+            <span class="chip">Модуль ${m.n} · ${esc(m.pairs)}</span>
+            <h2>${esc(m.title)}</h2>
+          </div>
+          <div class="topic">${m.blocks.map(b => `
+            <h4>${esc(b.title)}</h4>
+            ${b.empty ? `<p class="note empty">${esc(b.empty)}</p>` : ""}
+            <div class="list">${b.items.map(i => row(i, m.color)).join("")}</div>`).join("")}
+          </div>
+        </section>`).join("")}
+      </div>`;
+  }
+
+  code ? load() : login();
+})();
+</script>
+</body>
+</html>
