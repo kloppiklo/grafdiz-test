@@ -30,6 +30,7 @@
   let code = "";
   try { code = sessionStorage.getItem(CODE_KEY) || ""; } catch (e) {}
   let data = null, kind = "news", confirmDel = null, draft = "", file = null;
+  let mods = [], newMod = null, modOpen = false, modErr = "";
   const Kit = window.ChatKit;
   const savePush = sub => window.quizRpc("push_admin_subscribe", { p_code: code, p_sub: sub });
 
@@ -68,7 +69,10 @@
   }
 
   async function fetchData() {
-    try { data = await window.quizRpc("chat_list", { p_after: 0 }); render(); } catch (e) { if (!data) login("Не удалось загрузить чат. Проверьте интернет."); }
+    try {
+      [data, mods] = await Promise.all([window.quizRpc("chat_list", { p_after: 0 }), window.quizRpc("chat_admin_mod_list", { p_code: code })]);
+      render();
+    } catch (e) { if (!data) login("Не удалось загрузить чат. Проверьте интернет."); }
   }
 
   function delBtn(id) {
@@ -76,6 +80,70 @@
       ? `<span class="row"><button class="btn small" data-del-yes="${id}">Удалить</button><button class="btn small ghost" data-del-no>Отмена</button></span>`
       : `<button class="linkbtn inline" data-del="${id}">удалить</button>`;
   }
+
+  // ---------- модераторы: ученик с личным кодом удаляет любые сообщения и объявления
+  function modsHtml() {
+    const names = [...new Set(data.messages.filter(m => !m.is_teacher).map(m => m.first_name + "|" + m.last_name))];
+    const rows = mods.map(m => `
+      <div class="mod-row"><span class="sw" style="background:var(--mint)">🛡</span>
+        <span class="grow"><b>${esc(m.last_name)} ${esc(m.first_name)}</b><small class="note"> · с ${fmt(m.created_at).split(",")[0]}</small></span>
+        <button class="btn small ghost" data-mod-del="${m.id}">Снять права</button></div>`).join("");
+    return `
+      <section class="card mint">
+        <div class="row"><h2 class="grow">Модераторы чата</h2>${modOpen ? "" : `<button class="btn small" id="mod-open">Сделать модератором</button>`}</div>
+        <p class="note ink">Модератор может удалять любые сообщения и объявления в чате, в том числе ваши. Код вводится в приложении: «Профиль» → «Код модератора чата».</p>
+        ${newMod ? `<div class="card"><p>Код для <b>${esc(newMod.name)}</b>. Он показывается один раз — отправьте его ученику лично.</p>
+          <p class="mod-code">${esc(newMod.code)}</p><button class="btn small ghost" id="mod-ok">Готово</button></div>` : ""}
+        ${modOpen ? `<form id="mod-form" class="sub-form" novalidate>
+          <div class="two">
+            <input type="text" id="mod-first" placeholder="Имя" maxlength="60">
+            <input type="text" id="mod-last" placeholder="Фамилия" maxlength="60">
+          </div>
+          ${names.length ? `<div class="chips">${names.map(n => { const [f, l] = n.split("|"); return `<button type="button" class="chip" data-pick-f="${esc(f)}" data-pick-l="${esc(l)}">${esc(l)} ${esc(f)}</button>`; }).join("")}</div>` : ""}
+          <p class="error" ${modErr ? "" : "hidden"}>${esc(modErr)}</p>
+          <div class="row"><button class="btn small" type="submit">Выдать код</button><button class="btn small ghost" type="button" id="mod-cancel">Отмена</button></div>
+        </form>` : ""}
+        ${rows ? `<div class="list">${rows}</div>` : (modOpen ? "" : `<p class="muted">Модераторов пока нет.</p>`)}
+      </section>`;
+  }
+
+  function bindMods() {
+    const on = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
+    const keepDraft = () => { const ta = document.getElementById("body"); if (ta) draft = ta.value; };
+    on("mod-open", () => { keepDraft(); modOpen = true; modErr = ""; render(); });
+    on("mod-cancel", () => { keepDraft(); modOpen = false; render(); });
+    on("mod-ok", () => { keepDraft(); newMod = null; render(); });
+    app.querySelectorAll("[data-pick-f]").forEach(b => b.onclick = () => {
+      document.getElementById("mod-first").value = b.dataset.pickF; document.getElementById("mod-last").value = b.dataset.pickL;
+    });
+    const form = document.getElementById("mod-form");
+    if (form) form.addEventListener("submit", async e => {
+      e.preventDefault(); keepDraft();
+      const first = document.getElementById("mod-first").value.trim(), last = document.getElementById("mod-last").value.trim();
+      if (!first || !last) { modErr = "Впишите имя и фамилию ученика."; return render(); }
+      try {
+        const r = await window.quizRpc("chat_admin_mod_add", { p_code: code, p_first_name: first, p_last_name: last });
+        newMod = { name: first + " " + last, code: r.mod_code }; modOpen = false; modErr = "";
+        fetchData();
+      } catch (ex) { modErr = "Не получилось выдать код. Попробуйте ещё раз."; render(); }
+    });
+    app.querySelectorAll("[data-mod-del]").forEach(b => b.onclick = async () => {
+      if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Точно снять?"; return; }
+      keepDraft();
+      try { await window.quizRpc("chat_admin_mod_remove", { p_code: code, p_id: Number(b.dataset.modDel) }); fetchData(); }
+      catch (e) { b.textContent = "Не удалось"; }
+    });
+  }
+
+  // скриншот из буфера обмена: Ctrl/Cmd+V в любом месте страницы
+  document.addEventListener("paste", e => {
+    const ta = document.getElementById("body");
+    if (!ta || (e.target.tagName === "INPUT")) return;
+    const item = [...(e.clipboardData ? e.clipboardData.items : [])].find(i => i.kind === "file");
+    if (!item) return;
+    e.preventDefault(); draft = ta.value;
+    const f = item.getAsFile(); file = new File([f], "Скриншот.png", { type: f.type }); render();
+  });
 
   function render() {
     const ta = document.getElementById("body");
@@ -100,7 +168,7 @@
           <button type="button" class="chip ${kind === "news" ? "dark" : ""}" data-kind="news">Объявление</button>
           <button type="button" class="chip ${kind === "msg" ? "dark" : ""}" data-kind="msg">Сообщение в чат</button>
         </div>
-        <textarea id="body" maxlength="1000" placeholder="${kind === "news" ? "Например: в четверг пара в 214 аудитории" : "Сообщение от имени преподавателя"}">${esc(draft)}</textarea>
+        <textarea id="body" maxlength="1000" placeholder="${kind === "news" ? "Например: в четверг пара в 214 аудитории" : "Сообщение от имени преподавателя"}. Скриншот — Ctrl+V">${esc(draft)}</textarea>
         <div class="att-pending" id="pending" ${file ? "" : "hidden"}>${file ? `<span class="grow">📎 ${esc(file.name || "Скриншот")}</span><button type="button" class="icon-btn" id="unpick" aria-label="Убрать файл">✕</button>` : ""}</div>
         <label class="btn small ghost" for="file">Прикрепить файл или скриншот</label>
         <input type="file" id="file" hidden>
@@ -108,6 +176,7 @@
         <p class="error" id="post-err" hidden></p>
         <button class="btn block" type="submit">Опубликовать <span class="arr">→</span></button>
       </form>
+      ${modsHtml()}
       <h2>Объявления</h2>
       ${news ? `<section class="card yellow news">${news}</section>` : `<p class="muted">Объявлений пока нет.</p>`}
       <h2>Сообщения <small class="note">новые сверху</small></h2>
@@ -118,12 +187,7 @@
     const keep = () => { draft = document.getElementById("body").value; };
     document.getElementById("file").onchange = e => { keep(); file = e.target.files[0] || null; render(); };
     const un = document.getElementById("unpick"); if (un) un.onclick = () => { keep(); file = null; render(); };
-    document.getElementById("body").addEventListener("paste", e => {
-      const item = [...(e.clipboardData ? e.clipboardData.items : [])].find(i => i.kind === "file");
-      if (!item) return;
-      e.preventDefault(); keep();
-      const f = item.getAsFile(); file = new File([f], "Скриншот.png", { type: f.type }); render();
-    });
+    bindMods();
     app.querySelectorAll("[data-kind]").forEach(b => b.onclick = () => { kind = b.dataset.kind; render(); });
     app.querySelector("#post").addEventListener("submit", async e => {
       e.preventDefault();
@@ -152,7 +216,7 @@
 
   setInterval(() => {
     const ta = document.getElementById("body");
-    if (data && code && confirmDel === null && !(ta && ta.value) && document.visibilityState === "visible") fetchData();
+    if (data && code && confirmDel === null && !modOpen && !(ta && ta.value) && document.visibilityState === "visible") fetchData();
   }, 15000);
 
   if (code) checkCode(); else login();
