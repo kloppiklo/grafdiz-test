@@ -34,11 +34,15 @@
   const id = new URLSearchParams(location.search).get("t");
   const meta = window.TESTS.find(t => t.id === id && t.status === "open" && t.theory);
   if (!meta) { location.replace("./"); return; }
-  document.title = "Теория · " + meta.title;
-  document.getElementById("title").textContent = "Теория · " + meta.title;
+  // &d=<id> — дополнительная презентация темы из extras (kind: "deck")
+  const d = new URLSearchParams(location.search).get("d");
+  const extra = d && (meta.extras || []).find(x => x.kind === "deck" && x.id === d && x.src);
+  const name = extra ? extra.title : meta.title;
+  document.title = "Теория · " + name;
+  document.getElementById("title").textContent = "Теория · " + name;
   document.getElementById("totest").href = "test.html?t=" + encodeURIComponent(meta.id);
   const deck = document.getElementById("deck");
-  deck.src = meta.theory;
+  deck.src = extra ? extra.src : meta.theory;
   // отмечаем для журнала преподавателя, что ученик открыл теорию (раз в день на тему считается одна строка)
   const who = window.Student.get();
   if (who.first && who.last && window.quizRpc) window.quizRpc("theory_view", { p_first_name: who.first, p_last_name: who.last, p_theory: meta.id }).catch(() => {});
