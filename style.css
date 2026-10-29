@@ -723,6 +723,7 @@ table.journal-table th.lesson .pick-face svg { display: block; flex: none; }
 .module-head h2 { font-size: 28px; }
 .topic { display: flex; flex-direction: column; gap: 8px; }
 .topic h3 { margin: 4px 0 0 4px; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.topic h4 { margin: 10px 0 0 4px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); }
 .topic.soon { padding: 0 4px; }
 .topic.soon h3 { color: var(--ink-2); }
 .li.mat .kind { display: block; font-size: 12px; font-weight: 500; color: var(--ink-2); text-transform: none; margin-bottom: 1px; }

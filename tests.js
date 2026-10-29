@@ -3,6 +3,7 @@
 // theory — необязательная ссылка на презентацию с теорией (папка materials/).
 // extras — дополнительные материалы для вкладки «Теория»: kind = workbook (рабочая тетрадь), task (задание для группы), practice (практика пары),
 //   deck (ещё одна презентация: id + src, открывается через theory.html?t=<тема>&d=<id>).
+//   block — подзаголовок блока внутри темы (например, пара); theoryBlock — блок основной презентации. Отработка и тест попадают в «Вся тема».
 // otr — id отработки этой темы (см. OTRABOTKI). Модуль берётся из подписи module: «Модуль N · …».
 window.TESTS = [
   {
@@ -20,12 +21,12 @@ window.TESTS = [
     id: "color", status: "open", color: "pink",
     title: "Цвет", module: "Модуль 2 · цвет", count: 12,
     topics: ["Свет и глаз", "Цветовой круг", "Схемы", "Модели", "Психология"],
-    theory: "materials/color.html",
+    theory: "materials/color.html", theoryBlock: "Пары 06–07 · Основы цвета",
     extras: [
-      { kind: "deck", id: "comm", title: "Цвет как коммуникация", note: "пара 08: разминка, теория, приёмы Figma", href: "theory.html?t=color&d=comm", src: "materials/color-communication.html", short: "Пара 08" },
-      { kind: "practice", title: "Один объект — три сообщения", note: "пара 08: серия из 3 плакатов, жеребьёвка", href: "task-color-message.html", short: "Практика 08" },
-      { kind: "workbook", title: "Рабочая тетрадь «Цвет»", note: "PDF для печати, 12 страниц", href: "materials/color-workbook.pdf" },
-      { kind: "task", title: "Цветовое агентство", note: "работа в группах в Figma", href: "group-color.html", short: "Задание" }
+      { kind: "deck", id: "comm", title: "Цвет как коммуникация", note: "пара 08: разминка, теория, приёмы Figma", href: "theory.html?t=color&d=comm", src: "materials/color-communication.html", short: "Пара 08", block: "Пара 08 · Цвет как коммуникация" },
+      { kind: "practice", title: "Один объект — три сообщения", note: "пара 08: карточка товара вместе, затем серия из 3 плакатов", href: "task-color-message.html", short: "Практика 08", block: "Пара 08 · Цвет как коммуникация" },
+      { kind: "workbook", title: "Рабочая тетрадь «Цвет»", note: "PDF для печати, 12 страниц", href: "materials/color-workbook.pdf", block: "Пары 06–07 · Основы цвета" },
+      { kind: "task", title: "Цветовое агентство", note: "работа в группах в Figma", href: "group-color.html", short: "Задание", block: "Пары 06–07 · Основы цвета" }
     ], otr: "color"
   },
   { id: "module2", status: "soon", color: "pink", title: "Типографика", module: "Модуль 2 · пары 09–11" },

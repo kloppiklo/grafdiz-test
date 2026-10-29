@@ -362,15 +362,20 @@
         <span class="go">${isPdf(href) ? "↗" : "›"}</span></a>`;
     const topic = t => {
       if (t.status !== "open") return `<div class="topic soon"><h3>${esc(t.title)}</h3><p class="note">материалы появятся позже</p></div>`;
+      // items: [блок, html]; блок задаётся полем block у материала (theoryBlock — у основной презентации)
       const items = [];
-      if (t.theory) items.push(row("deck", t.title, "слайды с занятия", "theory.html?t=" + encodeURIComponent(t.id), t.color));
-      (t.extras || []).forEach(x => items.push(row(x.kind || (isPdf(x.href) ? "workbook" : "task"), x.title, x.note, x.href, t.color)));
+      if (t.theory) items.push([t.theoryBlock, row("deck", t.title, "слайды с занятия", "theory.html?t=" + encodeURIComponent(t.id), t.color)]);
+      (t.extras || []).forEach(x => items.push([x.block, row(x.kind || (isPdf(x.href) ? "workbook" : "task"), x.title, x.note, x.href, t.color)]));
+      const whole = items.some(i => i[0]) ? "Вся тема" : undefined;
       const o = OTR.find(q => q.id === t.otr);
-      if (o) items.push(row("otr", o.title, "если пропустили занятие", "otrabotka.html?m=" + encodeURIComponent(o.id), t.color));
-      items.push(row("test", t.title, t.count + " вопросов, результат увидит преподаватель", "test.html?t=" + encodeURIComponent(t.id), t.color));
+      if (o) items.push([whole, row("otr", o.title, "если пропустили занятие", "otrabotka.html?m=" + encodeURIComponent(o.id), t.color)]);
+      items.push([whole, row("test", t.title, t.count + " вопросов, результат увидит преподаватель", "test.html?t=" + encodeURIComponent(t.id), t.color)]);
+      const groups = [];
+      items.forEach(([b, html]) => { let g = groups.find(x => x.b === b); if (!g) groups.push(g = { b, rows: [] }); g.rows.push(html); });
+      const lists = groups.map(g => `${g.b ? `<h4>${esc(g.b)}</h4>` : ""}<div class="list">${g.rows.join("")}</div>`).join("");
       // заголовок темы не нужен, если он повторяет название модуля
       const head = (MODS.find(m => m.n === window.moduleOf(t)) || {}).title === t.title ? "" : `<h3>${esc(t.title)}</h3>`;
-      return `<div class="topic">${head}<div class="list">${items.join("")}</div></div>`;
+      return `<div class="topic">${head}${lists}</div>`;
     };
     const blocks = MODS.map(m => {
       const topics = window.TESTS.filter(t => window.moduleOf(t) === m.n);
