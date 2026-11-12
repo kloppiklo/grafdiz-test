@@ -1,5 +1,6 @@
 // Список тестов курса. Чтобы добавить тест: файл questions/<id>.js,
 // строка здесь со status: "open" и ключ ответов в базе для этого id.
+// status: "theory" — теста ещё нет, но материалы темы уже видны во вкладке «Теория».
 // theory — необязательная ссылка на презентацию с теорией (папка materials/).
 // extras — дополнительные материалы для вкладки «Теория»: kind = workbook (рабочая тетрадь), task (задание для группы), practice (практика пары),
 //   deck (ещё одна презентация: id + src, открывается через theory.html?t=<тема>&d=<id>).
@@ -29,7 +30,14 @@ window.TESTS = [
       { kind: "task", title: "Цветовое агентство", note: "работа в группах в Figma", href: "group-color.html", short: "Задание", block: "Пары 06–07 · Основы цвета" }
     ], otr: "color"
   },
-  { id: "module2", status: "soon", color: "pink", title: "Типографика", module: "Модуль 2 · пары 09–11" },
+  {
+    id: "module2", status: "theory", color: "pink",
+    title: "Типографика", module: "Модуль 2 · пары 09–11",
+    theory: "materials/typography-10.html", theoryBlock: "Пара 10 · Повторение и правила",
+    extras: [
+      { kind: "practice", title: "«Почини текст»", note: "пара 10: файл в Figma — сделайте Duplicate фрейма «Статья»", href: "https://www.figma.com/design/mgu9X06K2KASfKqr4JyqHO", short: "Практика 10", block: "Пара 10 · Повторение и правила" }
+    ]
+  },
   { id: "module3", status: "soon", color: "lavender", title: "Изображение и графическая система", module: "Модуль 3 · пары 12–17" },
   { id: "module4", status: "soon", color: "mint", title: "Illustrator и векторное мышление", module: "Модуль 4 · пары 18–25" },
   { id: "module5", status: "soon", color: "peach", title: "Плакат", module: "Модуль 5 · пары 26–29" },

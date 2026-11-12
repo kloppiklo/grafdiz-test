@@ -32,7 +32,7 @@
 // а верхняя полоска даёт вернуться на главную — в приложении на телефоне нет кнопки «назад».
 (function () {
   const id = new URLSearchParams(location.search).get("t");
-  const meta = window.TESTS.find(t => t.id === id && t.status === "open" && t.theory);
+  const meta = window.TESTS.find(t => t.id === id && t.theory && (t.status === "open" || t.status === "theory"));
   if (!meta) { location.replace("./"); return; }
   // &d=<id> — дополнительная презентация темы из extras (kind: "deck")
   const d = new URLSearchParams(location.search).get("d");
@@ -40,7 +40,8 @@
   const name = extra ? extra.title : meta.title;
   document.title = "Теория · " + name;
   document.getElementById("title").textContent = "Теория · " + name;
-  document.getElementById("totest").href = "test.html?t=" + encodeURIComponent(meta.id);
+  if (meta.status === "open") document.getElementById("totest").href = "test.html?t=" + encodeURIComponent(meta.id);
+  else document.getElementById("totest").style.display = "none";
   const deck = document.getElementById("deck");
   deck.src = extra ? extra.src : meta.theory;
   // отмечаем для журнала преподавателя, что ученик открыл теорию (раз в день на тему считается одна строка)

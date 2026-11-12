@@ -361,7 +361,8 @@
         <div class="grow"><span class="kind">${KIND[kind][0]}</span>${esc(title)}${note ? `<small>${esc(note)}</small>` : ""}</div>
         <span class="go">${isPdf(href) ? "↗" : "›"}</span></a>`;
     const topic = t => {
-      if (t.status !== "open") return `<div class="topic soon"><h3>${esc(t.title)}</h3><p class="note">материалы появятся позже</p></div>`;
+      const hasMat = t.status === "theory";
+      if (t.status !== "open" && !hasMat) return `<div class="topic soon"><h3>${esc(t.title)}</h3><p class="note">материалы появятся позже</p></div>`;
       // items: [блок, html]; блок задаётся полем block у материала (theoryBlock — у основной презентации)
       const items = [];
       if (t.theory) items.push([t.theoryBlock, row("deck", t.title, "слайды с занятия", "theory.html?t=" + encodeURIComponent(t.id), t.color)]);
@@ -369,7 +370,7 @@
       const whole = items.some(i => i[0]) ? "Вся тема" : undefined;
       const o = OTR.find(q => q.id === t.otr);
       if (o) items.push([whole, row("otr", o.title, "если пропустили занятие", "otrabotka.html?m=" + encodeURIComponent(o.id), t.color)]);
-      items.push([whole, row("test", t.title, t.count + " вопросов, результат увидит преподаватель", "test.html?t=" + encodeURIComponent(t.id), t.color)]);
+      if (t.status === "open") items.push([whole, row("test", t.title, t.count + " вопросов, результат увидит преподаватель", "test.html?t=" + encodeURIComponent(t.id), t.color)]);
       const groups = [];
       items.forEach(([b, html]) => { let g = groups.find(x => x.b === b); if (!g) groups.push(g = { b, rows: [] }); g.rows.push(html); });
       const lists = groups.map(g => `${g.b ? `<h4>${esc(g.b)}</h4>` : ""}<div class="list">${g.rows.join("")}</div>`).join("");
@@ -379,7 +380,7 @@
     };
     const blocks = MODS.map(m => {
       const topics = window.TESTS.filter(t => window.moduleOf(t) === m.n);
-      const open = topics.filter(t => t.status === "open");
+      const open = topics.filter(t => t.status === "open" || t.status === "theory");
       if (!open.length) return { m, html: "" };
       return { m, html: `
         <section class="module-block" id="mod-${m.n}">
