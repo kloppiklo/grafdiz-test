@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=25">
 </head>
 <body>
 <main class="wrap" id="app" aria-live="polite"></main>
@@ -304,15 +304,22 @@
 
     // темы текущего модуля: материалы и тест одной строкой
     const topicRow = t => {
-      if (!isLive(t)) return `<div class="dash-topic soon"><span class="sw" style="background:var(--cream)"></span><div class="grow">${esc(t.title)}<small>материалы появятся позже</small></div></div>`;
+      if (!isLive(t)) return `<div class="dash-topic soon"><div class="dt-head"><span class="dot" style="background:var(--${t.color})"></span><b>${esc(t.title)}</b></div><p class="note">материалы появятся позже</p></div>`;
       const r = t.status === "open" ? bestAny(t) : null;
       const links = [];
       if (t.theory) links.push(`<a class="chip ghost-w" href="theory.html?t=${encodeURIComponent(t.id)}">▶ Слайды</a>`);
       (t.extras || []).forEach(x => links.push(`<a class="chip ghost-w" href="${esc(x.href)}" ${/\.pdf$|^https?:/i.test(x.href) ? 'target="_blank" rel="noopener"' : ""}>${esc(x.short || x.title)}</a>`));
-      if (t.status === "open") links.push(`<a class="chip ${r ? "ghost-w" : "dark"}" href="test.html?t=${encodeURIComponent(t.id)}" data-id="${esc(t.id)}" ${r ? "data-again" : ""}>${r ? "Пересдать тест" : "Пройти тест →"}</a>`);
-      const state = r ? `<span class="pill ${cls(r)}">${r.score} / ${r.total}</span>` : t.status === "open" ? `<span class="pill plain">тест не пройден</span>` : `<span class="pill plain">теория</span>`;
-      return `<div class="dash-topic"><span class="sw" style="background:var(--${t.color})"></span>
-        <div class="grow"><div class="dt-head"><b>${esc(t.title)}</b>${state}</div><div class="chips">${links.join("")}</div></div></div>`;
+      // низ карточки: результат теста и действие
+      const foot = t.status !== "open"
+        ? `<span class="note">Теста по теме пока нет</span>`
+        : r ? `<span class="dt-res">Тест <span class="pill ${cls(r)}">${r.score} / ${r.total}</span></span>
+               <a class="linkbtn" href="test.html?t=${encodeURIComponent(t.id)}" data-id="${esc(t.id)}" data-again>Пересдать</a>`
+            : `<span class="note">Тест не пройден · ${t.count} вопросов</span>
+               <a class="btn small" href="test.html?t=${encodeURIComponent(t.id)}" data-id="${esc(t.id)}">Пройти <span class="arr">→</span></a>`;
+      return `<div class="dash-topic">
+        <div class="dt-head"><span class="dot" style="background:var(--${t.color})"></span><b>${esc(t.title)}</b></div>
+        ${links.length ? `<div class="chips">${links.join("")}</div>` : ""}
+        <div class="dt-foot">${foot}</div></div>`;
     };
 
     // весь курс: шесть модулей с прогрессом по тестам
