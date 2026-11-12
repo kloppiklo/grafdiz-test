@@ -722,6 +722,24 @@ table.journal-table th.lesson .pick-face svg { display: block; flex: none; }
 .module-block { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 16px; }
 .module-head { border-radius: var(--r-card); padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .module-head h2 { font-size: 28px; }
+.module-list { display: flex; flex-direction: column; gap: 10px; }
+.module-acc { scroll-margin-top: 16px; }
+.module-acc .module-head { flex-direction: row; list-style: none; cursor: pointer; border-radius: var(--r-card); padding: 16px 18px; display: flex; align-items: center; gap: 14px; }
+.module-acc .module-head::-webkit-details-marker { display: none; }
+.module-acc .mh-n { flex: none; width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, .7); display: grid; place-items: center; font-weight: 600; font-size: 17px; }
+.module-acc .mh-t { flex: 1 1 auto; min-width: 0; }
+.module-acc .mh-t h2 { margin: 0; font-size: 22px; line-height: 1.15; letter-spacing: -.02em; }
+.module-acc .mh-t small { display: block; margin-top: 3px; font-size: 13px; color: var(--ink-2); }
+.module-acc .mh-arr { flex: none; width: 32px; height: 32px; border-radius: 50%; background: rgba(255, 255, 255, .7); display: grid; place-items: center; font-size: 18px; line-height: 1; transition: transform .2s; }
+.module-acc[open] .mh-arr { transform: rotate(180deg); }
+.module-acc .module-body { display: flex; flex-direction: column; gap: 14px; padding: 16px 0 10px; }
+.module-acc.soon .module-head { gap: 12px; cursor: default; background: rgba(255, 255, 255, .55); color: var(--ink-2); }
+.module-acc.soon .module-head { padding: 12px 18px; }
+.module-acc.soon .mh-n { width: 32px; height: 32px; font-size: 14px; }
+.module-acc.soon .mh-t h2 { color: var(--ink-2); font-size: 17px; font-weight: 500; }
+.module-acc .mh-now { display: inline-block; margin-right: 8px; padding: 2px 8px; border-radius: 999px; background: var(--ink); color: var(--white); font-size: 11px; font-weight: 600; vertical-align: 1px; }
+.module-acc .module-head:hover .mh-arr { background: var(--white); }
+@media (min-width: 960px) { .module-acc:not(.soon) .mh-t h2 { font-size: 26px; } .module-acc .module-head { padding: 18px 22px; } }
 .topic { display: flex; flex-direction: column; gap: 8px; }
 .topic h3 { margin: 4px 0 0 4px; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
 .topic h4 { margin: 10px 0 0 4px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); }

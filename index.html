@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
-<link rel="stylesheet" href="style.css?v=25">
+<link rel="stylesheet" href="style.css?v=26">
 </head>
 <body>
 <main class="wrap" id="app" aria-live="polite"></main>
@@ -429,36 +429,34 @@
       const head = (MODS.find(m => m.n === window.moduleOf(t)) || {}).title === t.title ? "" : `<h3>${esc(t.title)}</h3>`;
       return `<div class="topic">${head}${lists}</div>`;
     };
+    // все модули видны сразу: свёрнутые цветные заголовки; раскрыт только модуль, на который перешли с главной
+    const cur = curModule();
+    const want = Number(theoryJump) || 0; theoryJump = null;
     const blocks = MODS.map(m => {
       const topics = window.TESTS.filter(t => window.moduleOf(t) === m.n);
-      const open = topics.filter(t => t.status === "open" || t.status === "theory");
-      if (!open.length) return { m, html: "" };
-      return { m, html: `
-        <section class="module-block" id="mod-${m.n}">
-          <div class="module-head" style="background:var(--${m.color})">
-            <span class="chip">Модуль ${m.n} · ${esc(m.pairs)}</span>
-            <h2>${esc(m.title)}</h2>
-          </div>
-          ${topics.map(topic).join("")}
-        </section>` };
+      const live = topics.filter(isLive);
+      const mats = live.reduce((n, t) => n + (t.theory ? 1 : 0) + (t.extras || []).length + (OTR.some(o => o.id === t.otr) ? 1 : 0), 0);
+      const tests = live.filter(t => t.status === "open").length;
+      if (!live.length) return `
+        <div class="module-acc soon" id="mod-${m.n}">
+          <div class="module-head"><span class="mh-n" style="background:var(--${m.color})">${m.n}</span>
+            <div class="mh-t"><h2>${esc(m.title)}</h2><small>${esc(m.pairs)} · скоро</small></div></div>
+        </div>`;
+      const meta = [mats && plural(mats, "материал", "материала", "материалов"), tests ? plural(tests, "тест", "теста", "тестов") : ""].filter(Boolean).join(" · ");
+      return `
+        <details class="module-acc" id="mod-${m.n}" ${m.n === want ? "open" : ""}>
+          <summary class="module-head" style="background:var(--${m.color})"><span class="mh-n">${m.n}</span>
+            <div class="mh-t"><h2>${esc(m.title)}</h2><small>${m.n === cur ? `<span class="mh-now">сейчас</span>` : ""}${esc(m.pairs)}${meta ? " · " + meta : ""}</small></div>
+            <span class="mh-arr" aria-hidden="true">⌄</span></summary>
+          <div class="module-body">${topics.map(topic).join("")}</div>
+        </details>`;
     });
-    const soon = blocks.filter(b => !b.html).map(b => `
-      <div class="li soonrow"><span class="sw" style="background:var(--${b.m.color})">${b.m.n}</span>
-        <div class="grow">${esc(b.m.title)}<small>Модуль ${b.m.n} · ${esc(b.m.pairs)} · материалы появятся позже</small></div></div>`).join("");
-    const jump = blocks.filter(b => b.html).map(b => `<a class="chip" href="#mod-${b.m.n}" data-jump="${b.m.n}">Модуль ${b.m.n}</a>`).join("");
     app.innerHTML = `
       <h1>Теория</h1>
-      <p class="muted">Материалы курса по модулям: презентации, рабочие тетради, задания для групп, отработки и тесты. Слайды листаются свайпом, на телефоне удобнее смотреть горизонтально.</p>
-      <div class="chips">${jump}</div>
-      ${blocks.map(b => b.html).join("")}
-      ${soon ? `<h2 class="sub">Дальше по курсу</h2><div class="list">${soon}</div>` : ""}`;
-    // переход к модулю без смены вкладки в адресе
-    app.querySelectorAll("[data-jump]").forEach(a => a.addEventListener("click", e => {
-      e.preventDefault();
-      document.getElementById("mod-" + a.dataset.jump).scrollIntoView({ behavior: "smooth", block: "start" });
-    }));
-    // пришли с главной по ссылке модуля — сразу показываем его
-    if (theoryJump) { const n = theoryJump; theoryJump = null; setTimeout(() => { const el = document.getElementById("mod-" + n); if (el) el.scrollIntoView({ block: "start" }); }, 0); }
+      <p class="muted">Материалы курса по модулям: презентации, рабочие тетради, задания для групп, отработки и тесты. Нажмите на модуль, чтобы открыть его. Слайды листаются свайпом, на телефоне удобнее смотреть горизонтально.</p>
+      <div class="module-list">${blocks.join("")}</div>`;
+    // пришли с главной по ссылке модуля — показываем его
+    if (want) setTimeout(() => { const el = document.getElementById("mod-" + want); if (el) el.scrollIntoView({ block: "start" }); }, 0);
   }
 
   function progressTab() {
