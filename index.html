@@ -271,47 +271,91 @@
     loadAssignments().then(list => { const b = document.getElementById("assign"); if (b) b.innerHTML = assignHtml(list); });
   }
 
-  // ---------- главная: что делать дальше и сводка
+  // ---------- главная: дашборд ученика — текущий модуль, посещаемость, результаты, весь курс
+  // Посещаемость и результаты тестов приходят из базы (student_dashboard), пока нет ответа — берём то, что есть на устройстве.
+  let dashCache = null, theoryJump = null;
+  async function loadDash() {
+    const who = window.Student.get();
+    try { dashCache = await window.quizRpc("student_dashboard", { p_first_name: who.first, p_last_name: who.last }); }
+    catch (e) { dashCache = dashCache || null; }
+    return dashCache;
+  }
+  // лучший результат теста: с этого устройства или из базы — какой выше
+  function bestAny(t) {
+    const local = best(t), srv = dashCache && (dashCache.tests || []).find(x => x.quiz === t.id);
+    if (!srv) return local;
+    return !local || pct(srv) > pct(local) ? srv : local;
+  }
+  const MODS = () => window.MODULES || [];
+  const topicsOf = n => window.TESTS.filter(t => window.moduleOf(t) === n);
+  const isLive = t => t.status === "open" || t.status === "theory";
+  // текущий модуль — последний, в котором уже есть материалы
+  const curModule = () => MODS().filter(m => topicsOf(m.n).some(isLive)).map(m => m.n).pop() || 1;
+
   function homeTab() {
     const who = window.Student.get();
+    const cur = curModule();
+    const M = MODS().find(m => m.n === cur) || { n: cur, title: "", pairs: "", color: "yellow" };
     const cont = OPEN.find(t => inProgress(t) !== null);
-    const next = OPEN.find(t => !best(t) && t !== cont);
-    const done = OPEN.filter(t => best(t));
-    const avg = done.length ? Math.round(done.reduce((s, t) => s + pct(best(t)), 0) / done.length * 100) : null;
-    const weak = done.filter(t => pct(best(t)) < 0.8).sort((a, b) => pct(best(a)) - pct(best(b)))[0];
-    const otrs = OTR_OPEN();
-    const otrDone = otrs.reduce((s, o) => s + otrSent(o), 0), otrAll = otrs.reduce((s, o) => s + o.pairs, 0);
-    const materials = OPEN.filter(t => t.theory).length + OPEN.reduce((s, t) => s + (t.extras || []).length, 0);
+    const done = OPEN.filter(t => bestAny(t));
+    const avg = done.length ? Math.round(done.reduce((s, t) => s + pct(bestAny(t)), 0) / done.length * 100) : null;
+    const otrOpen = (assignCache || []).filter(a => !(a.otr_tasks.length && a.otr_tasks.every(t => a.task_status[t] === "ok"))).length;
+    const att = dashCache && dashCache.past ? { p: dashCache.present, all: dashCache.past } : null;
 
-    let step = "";
-    if (cont) step = contCardHtml(cont);
-    else if (next) step = `<div class="next-wrap"><p class="eyebrow">Следующий тест</p>${testCard(next)}</div>`;
-    else if (weak) step = `<div class="next-wrap"><p class="eyebrow">Можно улучшить результат</p>${testCard(weak)}</div>`;
-    else step = `<section class="card mint"><h2>Все открытые тесты пройдены</h2><p>Новые темы появятся по ходу курса. А пока можно заглянуть в теорию или отработки.</p></section>`;
+    // темы текущего модуля: материалы и тест одной строкой
+    const topicRow = t => {
+      if (!isLive(t)) return `<div class="dash-topic soon"><span class="sw" style="background:var(--cream)"></span><div class="grow">${esc(t.title)}<small>материалы появятся позже</small></div></div>`;
+      const r = t.status === "open" ? bestAny(t) : null;
+      const links = [];
+      if (t.theory) links.push(`<a class="chip ghost-w" href="theory.html?t=${encodeURIComponent(t.id)}">▶ Слайды</a>`);
+      (t.extras || []).forEach(x => links.push(`<a class="chip ghost-w" href="${esc(x.href)}" ${/\.pdf$|^https?:/i.test(x.href) ? 'target="_blank" rel="noopener"' : ""}>${esc(x.short || x.title)}</a>`));
+      if (t.status === "open") links.push(`<a class="chip ${r ? "ghost-w" : "dark"}" href="test.html?t=${encodeURIComponent(t.id)}" data-id="${esc(t.id)}" ${r ? "data-again" : ""}>${r ? "Пересдать тест" : "Пройти тест →"}</a>`);
+      const state = r ? `<span class="pill ${cls(r)}">${r.score} / ${r.total}</span>` : t.status === "open" ? `<span class="pill plain">тест не пройден</span>` : `<span class="pill plain">теория</span>`;
+      return `<div class="dash-topic"><span class="sw" style="background:var(--${t.color})"></span>
+        <div class="grow"><div class="dt-head"><b>${esc(t.title)}</b>${state}</div><div class="chips">${links.join("")}</div></div></div>`;
+    };
+
+    // весь курс: шесть модулей с прогрессом по тестам
+    const course = MODS().map(m => {
+      const tp = topicsOf(m.n), tests = tp.filter(t => t.status === "open"), passed = tests.filter(t => bestAny(t));
+      const state = m.n < cur ? "past" : m.n === cur ? "now" : "next";
+      const sub = state === "next" ? "скоро" : tests.length ? `тестов пройдено ${passed.length} из ${tests.length}` : "материалы открыты";
+      const p = tests.length ? Math.round(passed.length / tests.length * 100) : 0;
+      return `<a class="li dash-mod ${state}" href="#theory" data-jump="${m.n}">
+        <span class="sw" style="background:var(--${state === "next" ? "cream" : m.color})">${m.n}</span>
+        <div class="grow">${esc(m.title)}<small>${esc(m.pairs)} · ${sub}</small>${state !== "next" && tests.length ? `<div class="bar"><i style="width:${p}%"></i></div>` : ""}</div>
+        ${state === "now" ? `<span class="pill wait">сейчас</span>` : state === "past" && tests.length && passed.length === tests.length ? `<span class="pill good">✓</span>` : `<span class="go">›</span>`}</a>`;
+    }).join("");
+    const track = MODS().map(m => `<i class="${m.n < cur ? "past" : m.n === cur ? "now" : ""}" title="Модуль ${m.n}"></i>`).join("");
 
     app.innerHTML = `
       <div class="hello"><div><p class="eyebrow">Привет,</p><h1 class="h-name">${esc(who.first)}!</h1></div>
         <a class="ava" href="#profile" aria-label="Профиль">${avaInner(who)}</a></div>
       <div id="assign"></div>
-      <div class="cols">
-        <div class="col">${step}</div>
-        <div class="col">
-          <a class="card lavender home-progress" href="#progress">
-            <p class="eyebrow">Ваш прогресс</p>
-            <p class="big-num">${done.length} <small>из ${OPEN.length} тестов</small></p>
-            <div class="bar light"><i style="width:${OPEN.length ? Math.round(done.length / OPEN.length * 100) : 0}%"></i></div>
-            <p class="note ink">${avg === null ? "Пройдите первый тест — здесь появится средний результат." : "Средний результат — " + avg + "%"}</p>
-          </a>
-        </div>
+      <section class="card dash-now" style="background:var(--${M.color})">
+        <div class="row between"><span class="chip ghost">Сейчас изучаем · Модуль ${M.n} из ${MODS().length}</span><span class="note ink">${esc(M.pairs)}</span></div>
+        <h2 class="dash-title">${esc(M.title)}</h2>
+        <div class="dash-track" aria-hidden="true">${track}</div>
+        ${cont ? contCardHtml(cont) : ""}
+        <div class="dash-topics">${topicsOf(cur).map(topicRow).join("")}</div>
+        <a class="btn ghost small" href="#theory" data-jump="${M.n}">Все материалы модуля <span class="arr">→</span></a>
+      </section>
+      <div class="tiles dash-stats">
+        <a class="tile" href="#progress" style="background:var(--yellow)"><b id="d-att">${att ? Math.round(att.p / att.all * 100) + "%" : "—"}</b><span id="d-att-s">${att ? `посещаемость · ${att.p} из ${att.all} занятий` : "посещаемость"}</span></a>
+        <a class="tile" href="#progress" style="background:var(--lavender)"><b>${avg === null ? "—" : avg + "%"}</b><span>средний результат тестов</span></a>
+        <a class="tile" href="#tests" style="background:var(--mint)"><b>${done.length}<small> / ${OPEN.length}</small></b><span>тестов пройдено</span></a>
+        <a class="tile" href="#otr" style="background:var(--pink)"><b>${otrOpen || "✓"}</b><span>${otrOpen ? "отработок не закрыто" : "долгов по отработкам нет"}</span></a>
       </div>
-      <div class="tiles">
-        <a class="tile" href="#tests" style="background:var(--yellow)"><b>Тесты</b><span>${OPEN.length} открыто</span></a>
-        <a class="tile" href="#otr" style="background:var(--pink)"><b>Отработки</b><span>${otrDone ? "сдано " + otrDone + " из " + otrAll : plural(otrs.length, "блок", "блока", "блоков")}</span></a>
-        <a class="tile" href="#theory" style="background:var(--blue)"><b>Теория</b><span>${plural(materials, "материал", "материала", "материалов")}</span></a>
-        <a class="tile" href="#chat" style="background:var(--mint)"><b>Чат</b><span>группа и объявления</span></a>
-      </div>`;
+      <h2 class="sub">Весь курс</h2>
+      <div class="list">${course}</div>`;
     bindAgain();
-    mountAssignments();
+    app.querySelectorAll("[data-jump]").forEach(a => a.addEventListener("click", () => { theoryJump = a.dataset.jump; }));
+    if (assignCache) document.getElementById("assign").innerHTML = assignHtml(assignCache);
+    // свежие данные из базы — перерисовываем, если ученик всё ещё на главной
+    const before = JSON.stringify([dashCache, assignCache]);
+    Promise.all([loadDash(), loadAssignments()]).then(() => {
+      if ((location.hash || "#home") === "#home" && JSON.stringify([dashCache, assignCache]) !== before) { const y = window.scrollY; homeTab(); window.scrollTo(0, y); }
+    });
   }
 
   // ---------- все тесты
@@ -406,6 +450,8 @@
       e.preventDefault();
       document.getElementById("mod-" + a.dataset.jump).scrollIntoView({ behavior: "smooth", block: "start" });
     }));
+    // пришли с главной по ссылке модуля — сразу показываем его
+    if (theoryJump) { const n = theoryJump; theoryJump = null; setTimeout(() => { const el = document.getElementById("mod-" + n); if (el) el.scrollIntoView({ block: "start" }); }, 0); }
   }
 
   function progressTab() {
