@@ -251,7 +251,7 @@
              <button type="button" class="btn small ghost" id="merge">Объединить с другим именем</button>
              <button type="button" class="btn small ghost" id="hide">Скрыть из журнала</button>`}
         </div>
-        ${mergeFor === s.key ? `<p class="note ink">Все результаты и отметки «${esc(nameOf(s))}» перейдут к выбранному ученику. Пригодится, если имя написали по-разному.</p>` : ""}
+        ${mergeFor === s.key ? `<p class="note ink">Тесты, теория, отработки и отметки «${esc(nameOf(s))}» перейдут к выбранному ученику. Если на одном занятии отмечены оба имени, останется «был(а)». Объединение можно отменить внизу журнала.</p>` : ""}
       </section>`;
     el.querySelector("#d-close").onclick = () => { openStudent = null; renameFor = null; render(); };
     const ro = el.querySelector("#rename-open"); if (ro) ro.onclick = () => { renameFor = s.key; mergeFor = null; render(); };
@@ -268,10 +268,7 @@
     }
     const m = el.querySelector("#merge"); if (m) m.onclick = () => { mergeFor = s.key; renameFor = null; render(); };
     const mn = el.querySelector("#merge-no"); if (mn) mn.onclick = () => { mergeFor = null; render(); };
-    const my = el.querySelector("#merge-yes"); if (my) my.onclick = () => {
-      const into = el.querySelector("#merge-into").value; mergeFor = null; openStudent = into;
-      call("journal_merge", { p_alias: s.key, p_canonical: into });
-    };
+    const my = el.querySelector("#merge-yes"); if (my) my.onclick = () => doMerge(s.key, el.querySelector("#merge-into").value);
     const h = el.querySelector("#hide"); if (h) h.onclick = () => { openStudent = null; call("journal_hide", { p_key: s.key, p_hidden: true }); };
   }
 
@@ -287,7 +284,36 @@
       </div>
       <div class="row"><button type="submit" class="btn small">Сохранить</button><button type="button" class="btn small ghost" id="rj-no">Отмена</button></div>
       <p class="note ink">Новое имя увидите вы — в журнале, тестах и отработках. У ученика в приложении останется имя, которое он ввёл сам.</p>
+      ${S.length > 1 ? `
+      <h2>Объединить с другим учеником</h2>
+      <div class="row">
+        <label class="field grow" for="rj-merge">Это тот же человек, что и…
+          <select id="rj-merge"><option value="">выберите ученика…</option>${S.filter(o => o.key !== s.key).map(o => `<option value="${esc(o.key)}">${esc(o.last)} ${esc(o.first)}</option>`).join("")}</select></label>
+        <button type="button" class="btn small" id="rj-merge-yes">Объединить</button>
+      </div>
+      <p class="note ink">Тесты, теория, отработки и отметки «${esc(nameOf(s))}» перейдут к выбранному ученику. Если на одном занятии отмечены оба имени, останется «был(а)». Объединение можно отменить внизу журнала.</p>` : ""}
     </form>`;
+  }
+  // объединение: alias — кого присоединяем, into — кто остаётся в журнале
+  function doMerge(alias, into) {
+    const a = S.find(x => x.key === alias), b = S.find(x => x.key === into);
+    if (!a || !b) return;
+    if (!confirm(`Объединить «${nameOf(a)}» с «${nameOf(b)}»?\n\nВ журнале останется «${nameOf(b)}» — со всеми тестами, теорией, отработками и отметками обоих.`)) return;
+    renameFor = null; mergeFor = null;
+    if (openStudent === alias) openStudent = into;
+    call("journal_merge", { p_alias: alias, p_canonical: into });
+  }
+  // список объединённых имён с кнопкой «разъединить»
+  function mergesNote() {
+    if (!D.merges.length) return "";
+    const nm = k => { const s = S.find(x => x.key === k); return s ? s.last + " " + s.first : hiddenName(k); };
+    return `<p class="note">Объединены: ${D.merges.map(m => `${esc(hiddenName(m.alias_key))} → ${esc(nm(m.canonical_key))} <button type="button" class="linkbtn inline" data-unmerge="${esc(m.alias_key)}">разъединить</button>`).join(" · ")}</p>`;
+  }
+  function bindUnmerge(el) {
+    el.querySelectorAll("[data-unmerge]").forEach(b => b.addEventListener("click", () => {
+      if (!confirm(`Разъединить «${hiddenName(b.dataset.unmerge)}»? Имя снова станет отдельным учеником, отметки вернутся как были до объединения.`)) return;
+      call("journal_unmerge", { p_alias: b.dataset.unmerge });
+    }));
   }
   function bindRename(el) {
     const f = el.querySelector("#rename-j");
@@ -300,6 +326,12 @@
         const key = renameFor; renameFor = null;
         call("journal_rename", { p_key: key, p_first_name: first, p_last_name: last });
       });
+      const mb = el.querySelector("#rj-merge-yes");
+      if (mb) mb.onclick = () => {
+        const into = el.querySelector("#rj-merge").value;
+        if (!into) { el.querySelector("#rj-merge").focus(); return; }
+        doMerge(renameFor, into);
+      };
       el.querySelector("#rj-first").focus();
     }
     el.querySelectorAll("[data-rename]").forEach(b => b.addEventListener("click", e => {
@@ -407,9 +439,11 @@
         <button type="button" class="btn small ghost" id="add-session">+ Ещё занятие в ${monthName(jMonth).toLowerCase().replace(/ь$/, "е").replace(/й$/, "е")}</button>
         <span class="legend"><i class="att was">✓</i> был(а)</span><span class="legend"><i class="att miss">Н</i> не был(а) — отработка</span>
       </div>
-      ${D.hidden.length ? `<p class="note">Скрыты из журнала: ${D.hidden.map(k => `${esc(hiddenName(k))} <button type="button" class="linkbtn inline" data-unhide="${esc(k)}">вернуть</button>`).join(" · ")}</p>` : ""}`;
+      ${D.hidden.length ? `<p class="note">Скрыты из журнала: ${D.hidden.map(k => `${esc(hiddenName(k))} <button type="button" class="linkbtn inline" data-unhide="${esc(k)}">вернуть</button>`).join(" · ")}</p>` : ""}
+      ${mergesNote()}`;
     bindRename(el);
     bindAdd(el);
+    bindUnmerge(el);
     const sessOf = id => D.sessions.find(x => x.id === id);
     el.querySelectorAll("[data-month]").forEach(b => b.addEventListener("click", () => { jMonth = b.dataset.month; render(); }));
     el.querySelectorAll(".date-pick").forEach(lb => lb.addEventListener("click", e => {
