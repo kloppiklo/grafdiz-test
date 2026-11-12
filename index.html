@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
-<link rel="stylesheet" href="style.css?v=27">
+<link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
 <main class="wrap" id="app" aria-live="polite"></main>
@@ -78,8 +78,13 @@
   // если tests.js ещё старый из кэша — работаем без фото, а не падаем
   const Avatar = window.Avatar || { get: () => "", set: () => false, clear() {}, fromFile: () => Promise.reject(new Error("no avatar")) };
   // кружок профиля: фото, если оно есть, иначе первая буква имени
-  const avaInner = who => { const ph = Avatar.get(); return ph ? `<img src="${ph}" alt="">` : esc((who.first || "?")[0].toUpperCase()); };
+  const avaInner = who => {
+    const ph = Avatar.get() || (dashCache && dashCache.avatar && Avatar.url ? Avatar.url(dashCache.avatar) : "");
+    return ph ? `<img src="${esc(ph)}" alt="">` : esc((who.first || "?")[0].toUpperCase());
+  };
   const cls = r => pct(r) >= 0.8 ? "good" : pct(r) >= 0.5 ? "mid" : "bad";
+
+  let dashCache = null;   // student_dashboard: посещаемость, тесты и фото из базы
 
   // ---------- welcome + знакомство
   let slide = 0;
@@ -273,11 +278,15 @@
 
   // ---------- главная: дашборд ученика — текущий модуль, посещаемость, результаты, весь курс
   // Посещаемость и результаты тестов приходят из базы (student_dashboard), пока нет ответа — берём то, что есть на устройстве.
-  let dashCache = null, theoryJump = null;
+  let theoryJump = null;
   async function loadDash() {
     const who = window.Student.get();
     try { dashCache = await window.quizRpc("student_dashboard", { p_first_name: who.first, p_last_name: who.last }); }
     catch (e) { dashCache = dashCache || null; }
+    if (dashCache && !dashCache.avatar && Avatar.get() && Avatar.publish && !read("quiz_avatar_sync")) {
+      write("quiz_avatar_sync", 1);
+      Avatar.publish(Avatar.get()).then(p => { dashCache.avatar = p; }).catch(() => {});
+    }
     return dashCache;
   }
   // лучший результат теста: с этого устройства или из базы — какой выше
@@ -490,6 +499,7 @@
 
   function profileTab() {
     const who = window.Student.get();
+    const hasPhoto = !!(Avatar.get() || (dashCache && dashCache.avatar));
     const installRow = isStandalone() ? "" : `
       <button class="li" id="p-install"><span class="sw" style="background:var(--cream)">⇪</span>
         <div class="grow">Установить приложение<small>иконка на экране «Домой»</small></div><span class="go">›</span></button>`;
@@ -501,9 +511,10 @@
       </section>
       <input type="file" id="p-file" accept="image/*" hidden>
       <p class="error" id="p-photo-err" hidden>Не получилось открыть это фото. Попробуйте другое — JPG или PNG.</p>
+      <p class="note" id="p-photo-wait" hidden>Сохраняем фото…</p>
       <div class="list">
-        <label class="li" for="p-file"><span class="sw" style="background:var(--cream)">◐</span><div class="grow">${Avatar.get() ? "Сменить фото" : "Добавить фото"}<small>видно только на этом устройстве</small></div><span class="go">›</span></label>
-        ${Avatar.get() ? `<button class="li" id="p-photo-del"><span class="sw" style="background:var(--cream)">✕</span><div class="grow">Убрать фото</div><span class="go">›</span></button>` : ""}
+        <label class="li" for="p-file"><span class="sw" style="background:var(--cream)">◐</span><div class="grow">${hasPhoto ? "Сменить фото" : "Добавить фото"}<small>его увидят одногруппники в чате и преподаватель</small></div><span class="go">›</span></label>
+        ${hasPhoto ? `<button class="li" id="p-photo-del"><span class="sw" style="background:var(--cream)">✕</span><div class="grow">Убрать фото</div><span class="go">›</span></button>` : ""}
         <button class="li" id="p-name"><span class="sw" style="background:var(--cream)">✎</span><div class="grow">Изменить имя</div><span class="go">›</span></button>
         ${installRow}
         <button class="li" id="p-mod"><span class="sw" style="background:var(--cream)">🛡</span>
@@ -550,17 +561,34 @@
     };
     document.getElementById("p-file").onchange = async e => {
       const err = document.getElementById("p-photo-err");
+      let data;
+      try { data = await Avatar.fromFile(e.target.files[0]); }
+      catch (ex) { err.hidden = false; return; }
+      document.getElementById("p-photo-wait").hidden = false;
       try {
-        const data = await Avatar.fromFile(e.target.files[0]);
-        if (!Avatar.set(data)) throw new Error("storage");
+        const path = await Avatar.publish(data);
+        if (dashCache) dashCache.avatar = path;
+        Avatar.set(data);
         profileTab();
-      } catch (ex) { err.hidden = false; }
+      } catch (ex) {
+        err.textContent = /another device/.test(ex.message)
+          ? "Фото уже поставлено с другого устройства. Смените его там или попросите преподавателя убрать старое."
+          : "Не получилось сохранить фото. Проверьте интернет и попробуйте ещё раз.";
+        err.hidden = false; document.getElementById("p-photo-wait").hidden = true;
+      }
     };
     const del = document.getElementById("p-photo-del");
-    if (del) del.onclick = () => { Avatar.clear(); profileTab(); };
+    if (del) del.onclick = async () => {
+      try { await Avatar.unpublish(); } catch (ex) {
+        if (/another device/.test(ex.message)) { const er = document.getElementById("p-photo-err"); er.textContent = "Это фото поставлено с другого устройства — убрать его можно там или попросить преподавателя."; er.hidden = false; return; }
+      }
+      Avatar.clear(); if (dashCache) dashCache.avatar = null; profileTab();
+    };
     document.getElementById("p-help").onclick = () => { slide = 0; welcome(true); };
     const pi = document.getElementById("p-install");
     if (pi) pi.onclick = () => { slide = 2; welcome(true); };
+    // фото могли поставить с другого устройства — подтягиваем из базы
+    if (!dashCache) loadDash().then(d => { if (d && d.avatar && (location.hash || "") === "#profile") profileTab(); });
   }
 
   // Выход: стираем всё, что приложение хранит на устройстве о студенте (имя, фото, прогресс,
@@ -595,6 +623,12 @@
   });
   const Kit = window.ChatKit;
   const savePush = sub => { const w = window.Student.get(); return window.quizRpc("push_subscribe", { p_sub: sub, p_first_name: w.first, p_last_name: w.last }); };
+  // кружок автора в чате: фото из базы или первые буквы
+  const msgAva = m => {
+    const path = chatData && chatData.avatars && m.skey ? chatData.avatars[m.skey] : "";
+    return path && Avatar.url ? `<img class="msg-ava" src="${esc(Avatar.url(path))}" alt="" loading="lazy">`
+      : `<span class="msg-ava">${esc(((m.first_name || "")[0] || "") + ((m.last_name || "")[0] || "")).toUpperCase()}</span>`;
+  };
   const sameName = (m, who) => !m.is_teacher && m.first_name.toLowerCase() === who.first.toLowerCase() && m.last_name.toLowerCase() === who.last.toLowerCase();
   const chatTime = iso => {
     const d = new Date(iso), today = new Date().toDateString() === d.toDateString();
@@ -689,7 +723,7 @@
       const me = sameName(m, who), day = new Date(m.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
       const sep = day !== prevDay ? `<p class="chat-day">${day}</p>` : ""; prevDay = day;
       return `${sep}<div class="msg ${me ? "me" : ""} ${m.is_teacher ? "teacher" : ""}">
-        ${me ? "" : `<b>${m.is_teacher ? "Преподаватель" : esc(m.first_name + " " + m.last_name)}</b>`}
+        ${me ? "" : `<b class="msg-who">${m.is_teacher ? "" : msgAva(m)}${m.is_teacher ? "Преподаватель" : esc(m.first_name + " " + m.last_name)}</b>`}
         ${Kit ? Kit.attachment(m) : ""}${m.body ? `<p>${chatText(m.body)}</p>` : ""}
         <span class="note">${chatTime(m.created_at)}${delLink(m.id, !!mine[m.id])}</span></div>`;
     }).join("") : `<div class="card mint"><h2>Здесь пока тихо</h2><p>Напишите первое сообщение: вопрос по заданию, полезная ссылка или просто «привет».</p></div>`;

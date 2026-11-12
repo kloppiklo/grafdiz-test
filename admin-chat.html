@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
-<link rel="stylesheet" href="style.css?v=23">
+<link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
 <main class="wrap admin" id="app"></main>
@@ -150,9 +150,15 @@
     if (ta) draft = ta.value;
     const news = data.news.map(n => `
       <div class="news-item">${n.body ? `<p>${text(n.body)}</p>` : ""}${Kit.attachment(n)}<span class="note">${fmt(n.created_at)} · ${delBtn(n.id)}</span></div>`).join("");
+    // кружок автора: фото ученика из базы или первые буквы
+    const msgAva = m => {
+      const path = data.avatars && m.skey ? data.avatars[m.skey] : "";
+      return path ? `<img class="msg-ava" src="${esc(window.Avatar.url(path))}" alt="" loading="lazy">`
+        : `<span class="msg-ava">${esc(((m.first_name || "")[0] || "") + ((m.last_name || "")[0] || "")).toUpperCase()}</span>`;
+    };
     const msgs = data.messages.slice().reverse().map(m => `
       <div class="msg ${m.is_teacher ? "teacher" : ""}">
-        <b>${m.is_teacher ? "Преподаватель" : esc(m.last_name + " " + m.first_name)}</b>
+        <b class="msg-who">${m.is_teacher ? "" : msgAva(m)}${m.is_teacher ? "Преподаватель" : esc(m.last_name + " " + m.first_name)}</b>
         ${Kit.attachment(m)}${m.body ? `<p>${text(m.body)}</p>` : ""}
         <span class="note">${fmt(m.created_at)} · ${delBtn(m.id)}</span></div>`).join("");
     app.innerHTML = `

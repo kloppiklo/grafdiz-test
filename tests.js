@@ -77,6 +77,36 @@ window.Avatar = {
   get() { try { return localStorage.getItem(this.KEY) || ""; } catch (e) { return ""; } },
   set(dataUrl) { try { localStorage.setItem(this.KEY, dataUrl); return true; } catch (e) { return false; } },
   clear() { try { localStorage.removeItem(this.KEY); } catch (e) {} },
+  // фото видят все (чат, журнал): картинка уходит в хранилище, в базе — чья она.
+  // Менять его может только это устройство (секрет TOKEN) или преподаватель.
+  TOKEN: "quiz_avatar_token",
+  token() {
+    let t = "";
+    try { t = localStorage.getItem(this.TOKEN) || ""; } catch (e) {}
+    if (!t) {
+      t = Array.from(crypto.getRandomValues(new Uint8Array(24)), b => b.toString(16).padStart(2, "0")).join("");
+      try { localStorage.setItem(this.TOKEN, t); } catch (e) {}
+    }
+    return t;
+  },
+  // путь к фото в хранилище → адрес картинки
+  url(path) { return path ? window.QUIZ_API.url + "/storage/v1/object/public/chat-files/" + path.split("/").map(encodeURIComponent).join("/") : ""; },
+  async publish(dataUrl) {
+    const who = window.Student.get();
+    const blob = await (await fetch(dataUrl)).blob();
+    const id = crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+    const path = "u/" + id + "/avatar.jpg";
+    const res = await fetch(window.QUIZ_API.url + "/storage/v1/object/chat-files/" + path, {
+      method: "POST", headers: { apikey: window.QUIZ_API.key, "Content-Type": "image/jpeg", "x-upsert": "false" }, body: blob
+    });
+    if (!res.ok) throw new Error("upload");
+    await window.quizRpc("avatar_set", { p_first_name: who.first, p_last_name: who.last, p_path: path, p_token: this.token() });
+    return path;
+  },
+  unpublish() {
+    const who = window.Student.get();
+    return window.quizRpc("avatar_set", { p_first_name: who.first, p_last_name: who.last, p_path: null, p_token: this.token() });
+  },
   // обрезает фото по центру до квадрата и уменьшает
   fromFile(file, size = 320) {
     return new Promise((resolve, reject) => {

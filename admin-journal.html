@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
-<link rel="stylesheet" href="style.css?v=23">
+<link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
 <main class="wrap admin journal" id="app"></main>
@@ -49,6 +49,12 @@
   const pairNo = n => String(n).padStart(2, "0");
   const colorOf = key => AVATAR[[...key].reduce((h, c) => h + c.charCodeAt(0), 0) % AVATAR.length];
   const nameOf = s => s.first + " " + s.last;
+  // кружок ученика: фото, если он его поставил в приложении, иначе инициалы
+  const avaHtml = s => {
+    const path = D && D.avatars ? D.avatars[s.key] : "";
+    return path ? `<span class="avatar sm photo"><img src="${esc(window.Avatar.url(path))}" alt="" loading="lazy"></span>`
+      : `<span class="avatar sm" style="background:var(--${colorOf(s.key)})">${esc((s.first[0] || "") + (s.last[0] || "")).toUpperCase()}</span>`;
+  };
   const pctCls = p => p >= 0.8 ? "good" : p >= 0.5 ? "mid" : "bad";
 
   // ---------- вход
@@ -183,7 +189,7 @@
       }).join("");
       const ow = openOtr(s);
       return `<tr class="srow ${openStudent === s.key ? "on" : ""}" data-key="${esc(s.key)}">
-        <td><span class="who"><span class="avatar sm" style="background:var(--${colorOf(s.key)})">${esc((s.first[0] || "") + (s.last[0] || "")).toUpperCase()}</span>${esc(s.last)} ${esc(s.first)}<button type="button" class="pen-btn" data-rename="${esc(s.key)}" aria-label="Изменить имя ${esc(s.first + " " + s.last)}" title="Изменить имя">✎</button></span></td>
+        <td><span class="who">${avaHtml(s)}${esc(s.last)} ${esc(s.first)}<button type="button" class="pen-btn" data-rename="${esc(s.key)}" aria-label="Изменить имя ${esc(s.first + " " + s.last)}" title="Изменить имя">✎</button></span></td>
         ${cells}
         <td class="num">${PAST.length ? `${s.present}/${PAST.length}` : "—"}</td>
         <td class="num">${ow.length ? `<span class="pill bad">${ow.length}</span>` : (s.assigned.length ? `<span class="pill good">✓</span>` : `<span class="muted">—</span>`)}</td>
@@ -249,7 +255,8 @@
             <button type="button" class="btn small ghost" id="merge-no">Отмена</button>`
           : `<button type="button" class="btn small ghost" id="rename-open">Переименовать</button>
              <button type="button" class="btn small ghost" id="merge">Объединить с другим именем</button>
-             <button type="button" class="btn small ghost" id="hide">Скрыть из журнала</button>`}
+             <button type="button" class="btn small ghost" id="hide">Скрыть из журнала</button>
+             ${D.avatars && D.avatars[s.key] ? `<button type="button" class="btn small ghost" id="ava-clear">Убрать фото</button>` : ""}`}
         </div>
         ${mergeFor === s.key ? `<p class="note ink">Тесты, теория, отработки и отметки «${esc(nameOf(s))}» перейдут к выбранному ученику. Если на одном занятии отмечены оба имени, останется «был(а)». Объединение можно отменить внизу журнала.</p>` : ""}
       </section>`;
@@ -269,6 +276,8 @@
     const m = el.querySelector("#merge"); if (m) m.onclick = () => { mergeFor = s.key; renameFor = null; render(); };
     const mn = el.querySelector("#merge-no"); if (mn) mn.onclick = () => { mergeFor = null; render(); };
     const my = el.querySelector("#merge-yes"); if (my) my.onclick = () => doMerge(s.key, el.querySelector("#merge-into").value);
+    const ac = el.querySelector("#ava-clear");
+    if (ac) ac.onclick = () => { if (confirm(`Убрать фото у «${nameOf(s)}»? Ученик сможет поставить новое.`)) call("journal_avatar_clear", { p_key: s.key }); };
     const h = el.querySelector("#hide"); if (h) h.onclick = () => { openStudent = null; call("journal_hide", { p_key: s.key, p_hidden: true }); };
   }
 
@@ -416,7 +425,7 @@
         <span class="lt" title="${L ? esc(L.title) : ""}">${L ? esc(L.title) : "&nbsp;"}</span>
       </th>`;
     }).join("");
-    const rows = S.map(s => `<tr><td class="sticky"><button type="button" class="who name-btn" data-rename="${esc(s.key)}" title="Изменить имя"><span class="avatar sm" style="background:var(--${colorOf(s.key)})">${esc((s.first[0] || "") + (s.last[0] || "")).toUpperCase()}</span>${esc(s.last)} ${esc(s.first)}<span class="pen" aria-hidden="true">✎</span></button></td>
+    const rows = S.map(s => `<tr><td class="sticky"><button type="button" class="who name-btn" data-rename="${esc(s.key)}" title="Изменить имя">${avaHtml(s)}${esc(s.last)} ${esc(s.first)}<span class="pen" aria-hidden="true">✎</span></button></td>
       ${sess.map(x => {
         if (!x.session_date) return `<td class="mark"><span class="att off" title="Сначала поставьте дату">·</span></td>`;
         const v = s.marks[x.id];
