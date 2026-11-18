@@ -798,3 +798,11 @@ a.chip:hover { background: var(--ink); color: var(--white); }
 .msg-ava { flex: none; width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: var(--cream); display: inline-grid; place-items: center; font-size: 9px; font-weight: 600; color: var(--ink); }
 .avatar.photo { padding: 0; overflow: hidden; background: var(--cream); }
 .avatar.photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* чат на телефоне: пока открыта клавиатура, меню скрыто, поле ввода прижато к низу */
+@media (max-width: 959px) {
+  body.chat-typing .tabbar { display: none; }
+  body.chat-typing.has-tabs { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+  body.chat-typing .composer { bottom: max(8px, env(safe-area-inset-bottom)); }
+}
+.composer textarea { overflow-y: auto; }

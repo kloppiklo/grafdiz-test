@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#f6f0e2">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
-<link rel="stylesheet" href="style.css?v=28">
+<link rel="stylesheet" href="style.css?v=29">
 </head>
 <body>
 <main class="wrap" id="app" aria-live="polite"></main>
@@ -609,7 +609,7 @@
   // Лента обновляется каждые 8 секунд, пока открыта вкладка. Свои сообщения можно удалить (ключ — на этом устройстве).
   // К сообщению можно прикрепить один файл или скриншот (кнопка-скрепка или вставка из буфера), уведомления — кнопкой над лентой.
   const MINE = "quiz_chat_mine";
-  let chatTimer = null, chatData = null, chatFile = null, chatPick = null;
+  let chatTimer = null, chatData = null, chatFile = null, chatPick = null, chatSig = "";
   const MOD = "quiz_chat_mod";
   // скриншот из буфера обмена: Ctrl/Cmd+V в любом месте вкладки «Чат»
   document.addEventListener("paste", e => {
@@ -671,8 +671,23 @@
       chatPick = pick;
       if (window.matchMedia("(hover: hover)").matches) ta.placeholder = "Сообщение или скриншот (Ctrl+V)";
     }
-    const grow = () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 160) + "px"; };
+    // высота поля по тексту; прокрутку страницы сохраняем, иначе на телефоне она дёргается при каждой букве
+    const grow = () => {
+      const y = window.scrollY, h = ta.offsetHeight;
+      ta.style.height = h + "px"; ta.style.height = "0px";
+      const next = Math.min(Math.max(ta.scrollHeight, 44), 160);
+      ta.style.height = next + "px";
+      window.scrollTo(0, y + (next - h));
+    };
     ta.addEventListener("input", grow);
+    // на телефоне, пока открыта клавиатура, прячем нижнее меню: поле ввода прижимается к клавиатуре и не прыгает
+    const touch = !window.matchMedia("(hover: hover)").matches;
+    if (touch) {
+      ta.addEventListener("focus", () => document.body.classList.add("chat-typing"));
+      ta.addEventListener("blur", () => document.body.classList.remove("chat-typing"));
+    }
+    // нажатие на «Отправить» и скрепку не забирает фокус у поля — клавиатура не закрывается и не открывается заново
+    form.querySelectorAll(".send, .attach").forEach(b => b.addEventListener("pointerdown", e => { if (document.activeElement === ta) e.preventDefault(); }));
     ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && window.matchMedia("(hover: hover)").matches) { e.preventDefault(); form.requestSubmit(); } });
     form.addEventListener("submit", async e => {
       e.preventDefault();
@@ -696,15 +711,22 @@
         err.hidden = false;
       }
       btn.classList.remove("busy");
-      btn.disabled = false; ta.focus();
+      btn.disabled = false;
+      if (!touch) ta.focus();
     });
+    chatSig = "";
     loadChat(true);
     chatTimer = setInterval(() => { if (document.visibilityState === "visible") loadChat(false); }, 8000);
   }
 
   async function loadChat(toBottom) {
-    try { chatData = await window.quizRpc("chat_list", { p_after: 0 }); }
+    let fresh;
+    try { fresh = await window.quizRpc("chat_list", { p_after: 0 }); }
     catch (e) { if (!chatData) { const f = document.getElementById("feed"); if (f) f.innerHTML = `<p class="note">Не удалось загрузить чат. Проверьте интернет.</p>`; } return; }
+    // перерисовываем ленту, только если что-то изменилось: иначе картинки перезагружаются и лента скачет
+    const sig = JSON.stringify(fresh);
+    if (sig === chatSig) return;
+    chatSig = sig; chatData = fresh;
     renderChat(toBottom);
   }
 
@@ -714,6 +736,7 @@
     const who = window.Student.get(), mine = read(MINE) || {}, mod = read(MOD);
     const delLink = (id, own) => own || mod ? ` · <button type="button" class="linkbtn inline" data-del="${id}" ${own ? "" : "data-mod"}>удалить</button>` : "";
     const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 160;
+    const keepY = window.scrollY;
     news.innerHTML = chatData.news.length ? `
       <section class="card yellow news"><p class="eyebrow ink">Объявления</p>
         ${chatData.news.slice(0, 3).map(n => `<div class="news-item">${n.body ? `<p>${chatText(n.body)}</p>` : ""}${Kit ? Kit.attachment(n) : ""}<span class="note">${chatTime(n.created_at)}${delLink(n.id, false)}</span></div>`).join("")}
@@ -737,11 +760,12 @@
         loadChat(false);
       } catch (e) {
         // права отозвали — убираем код с устройства
-        if (/mod code/.test(e.message)) { try { localStorage.removeItem(MOD); } catch (x) {} loadChat(false); }
+        if (/mod code/.test(e.message)) { try { localStorage.removeItem(MOD); } catch (x) {} chatSig = ""; loadChat(false); }
         b.textContent = "не удалось";
       }
     }));
-    if (toBottom || nearBottom) {
+    if (!(toBottom || nearBottom)) window.scrollTo(0, keepY);
+    else {
       const down = () => window.scrollTo(0, document.body.scrollHeight);
       down();
       // картинки догружаются позже и сдвигают ленту — докручиваем после каждой
@@ -759,7 +783,7 @@
     if (!read(ONBOARDED) || !who.first || !who.last) { slide = 0; return welcome(false); }
     const tab = (location.hash || "#home").slice(1);
     const view = VIEWS[tab] ? tab : "home";
-    clearInterval(chatTimer); chatTimer = null; chatPick = null;
+    clearInterval(chatTimer); chatTimer = null; chatPick = null; document.body.classList.remove("chat-typing");
     document.body.classList.add("has-tabs");
     renderBar(view);
     VIEWS[view]();
