@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f0e2">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Типографическая афиша</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="style.css?v=24">
+<style>
+  .wrap.task { max-width: 920px; }
+  .draw { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .mcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .mcard { border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .mcard .lbl { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .mcard b { font-size: 22px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; }
+  .mcard small { font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+  .linkbtn.u { align-self: flex-start; padding: 0; font-size: 13px; text-decoration: underline; color: var(--ink); }
+  .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+  .rule { border-radius: 18px; padding: 14px; }
+  .rule b { display: block; margin-bottom: 4px; }
+  .timeline { display: flex; flex-direction: column; gap: 8px; }
+  .step { display: grid; grid-template-columns: 28px 64px minmax(0, 1fr); gap: 12px; align-items: start; background: var(--white); border-radius: var(--r-row); padding: 14px; cursor: pointer; }
+  .step input { width: 22px; height: 22px; margin: 0; accent-color: var(--ink); cursor: pointer; }
+  .step .t { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .step small { display: block; color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+  .step.done b { text-decoration: line-through; color: var(--ink-2); }
+  .hints { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  .hint { background: var(--white); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .hint.mine { outline: 2px solid var(--ink); }
+  .hint b { font-size: 16px; }
+  .hint small { color: var(--ink-2); font-size: 13px; line-height: 1.4; }
+  ul.clean, ol.clean { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .event { background: var(--white); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+  .event .ttl { font-size: 26px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; }
+  .event .row2 { font-weight: 600; }
+  .event .det { color: var(--ink-2); font-size: 14px; line-height: 1.45; }
+  .copy { align-self: flex-start; margin-top: 6px; }
+  .event .btn.ghost { background: var(--cream); }
+  .words { display: flex; flex-wrap: wrap; gap: 8px; }
+  .words span { background: var(--white); border-radius: 999px; padding: 10px 16px; font-size: 20px; font-weight: 600; }
+  .own { display: none; flex-direction: column; gap: 10px; }
+  .own.on { display: flex; }
+  .own select { font: inherit; padding: 10px 12px; border-radius: 12px; border: 0; background: var(--white); max-width: 100%; }
+</style>
+</head>
+<body>
+<main class="wrap task" id="app">
+  <div class="topbar"><a class="icon-btn" href="./#theory" aria-label="Назад">←</a><span class="chip">Модуль 2 · типографика</span><span class="chip">пара 11 · практика</span></div>
+  <h1>Типографическая<br><em>афиша</em></h1>
+  <p class="muted">Сегодня шрифт работает как изображение. Сначала 15 минут разминки: три слова — только буквами. Потом 35 минут собираем афишу события без единой картинки. Событие и главный приём вытягиваете по жребию.</p>
+
+  <section class="card yellow">
+    <div class="row"><h2 class="grow">Разминка · три слова</h2><span class="chip">15 мин</span></div>
+    <p class="note ink">Три фрейма 1080 × 1080, по 5 минут на слово. Одна гарнитура, только чёрный текст на белом. Нельзя: картинки, фигуры, цвет, эффекты. Можно: кегль, начертание, трекинг, интерлиньяж, поворот, обрез, повтор, разбивка на буквы. Слово должно «показывать» свой смысл.</p>
+    <div class="row"><button type="button" class="btn" id="dealWords">Вытянуть слова <span class="arr">→</span></button></div>
+    <div class="words" id="words"></div>
+  </section>
+
+  <section class="card pink">
+    <div class="row"><h2 class="grow">Афиша · ваше задание</h2><span class="chip">35 мин</span></div>
+    <p class="note ink">Нажмите «Вытянуть»: выпадет событие и главный приём. Не нравится что-то одно — поменяйте только его. Можно выбрать и самому.</p>
+    <div class="row">
+      <button type="button" class="btn" id="deal">Вытянуть задание <span class="arr">→</span></button>
+      <button type="button" class="linkbtn u" id="ownToggle">выбрать самому</button>
+    </div>
+    <div class="own" id="own"></div>
+    <div class="draw" id="draw"></div>
+  </section>
+
+  <h2 class="sub">Ограничения</h2>
+  <div class="rules">
+    <div class="rule" style="background:var(--yellow)"><b>Формат</b>Фрейм A3 вертикальный: 842 × 1191. У фрейма включён Clip content.</div>
+    <div class="rule" style="background:var(--lavender)"><b>Только шрифт</b>Никаких фото и иллюстраций. Можно одну простую фигуру: линию, круг или плашку.</div>
+    <div class="rule" style="background:var(--mint)"><b>Гарнитуры и цвет</b>Не больше 2 гарнитур (лучше одна с разными начертаниями) и не больше 3 цветов вместе с фоном.</div>
+    <div class="rule" style="background:var(--peach)"><b>Вся информация</b>Название, дата, время, место и детали события — всё на афише. Тексты копируйте отсюда, они уже набраны правильно.</div>
+  </div>
+
+  <h2 class="sub">Шаги <span class="note" id="progress"></span></h2>
+  <div class="timeline" id="steps"></div>
+
+  <h2 class="sub">Три уровня афиши</h2>
+  <div class="rules">
+    <div class="rule" style="background:var(--white)"><b>1 · Что</b>Главное слово-образ. С ним работает ваш приём. Видно с 3 метров.</div>
+    <div class="rule" style="background:var(--white)"><b>2 · Когда и где</b>Дата, время, место. Читается со второго взгляда.</div>
+    <div class="rule" style="background:var(--white)"><b>3 · Детали</b>Цена, возраст, адрес. Мелко, но по правилам набора: «ёлочки», тире, без висячих предлогов.</div>
+  </div>
+
+  <h2 class="sub">Подсказки к приёмам</h2>
+  <p class="note">Ваш приём выделен рамкой. Остальные можно добавить как второстепенные, но главный должен быть один.</p>
+  <div class="hints" id="hints"></div>
+
+  <div class="cols">
+    <div class="col">
+      <h2 class="sub">Приёмы в Figma</h2>
+      <section class="card">
+        <ul class="clean">
+          <li><b>Auto width</b> — для крупного слова, чтобы блок не переносил буквы.</li>
+          <li><b>Letter spacing и Line height в %</b>: для крупных слов трекинг −2…−8 %, интерлиньяж 80–100 %.</li>
+          <li><b>Поворот</b> — поле угла на панели Design, с Shift — шаг 15°.</li>
+          <li><b>Clip content</b> у фрейма — всё, что за краем, обрезается.</li>
+          <li><b>Outline stroke ⌥⌘O</b> — текст в кривые, чтобы двигать буквы. Сначала копия: текст перестанет редактироваться.</li>
+          <li><b>Неразрывный пробел</b> — Option + пробел.</li>
+        </ul>
+      </section>
+    </div>
+    <div class="col">
+      <h2 class="sub">Критерии</h2>
+      <section class="card">
+        <ul class="clean">
+          <li>С 3 метров видно главное слово</li>
+          <li>Главный приём читается без подписи</li>
+          <li>Три уровня информации, одно главное</li>
+          <li>Только шрифт, не больше 2 гарнитур и 3 цветов</li>
+          <li>Детали набраны по правилам: «ёлочки», тире, предлоги</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <h2 class="sub">Разбор «Угадай приём»</h2>
+  <section class="card lavender">
+    <p>Показываем афиши на общем экране <b>без подписей</b>. Группа угадывает событие и главный приём, потом автор рассказывает, что хотел. Обсуждаем:</p>
+    <ul class="clean">
+      <li>Что вы прочитали первым, вторым и третьим?</li>
+      <li>Какой приём главный и помогает ли он смыслу события?</li>
+      <li>Что убрать, чтобы главное стало сильнее?</li>
+    </ul>
+  </section>
+
+  <h2 class="sub">Домашнее задание</h2>
+  <section class="card mint">
+    <p>1. Доведите афишу до чистовика по критериям. Ссылку на фрейм пришлите в чат до следующего занятия.</p>
+    <p>2. К паре 12 «Изображение в дизайне» подготовьте <b>3 фотографии</b>: портрет, предмет, архитектура или пейзаж. Свои или с Unsplash, Pexels — от 2000 px по длинной стороне. Принесите их в файле Figma.</p>
+  </section>
+</main>
+
+<script>
+// Жеребьёвка: 3 слова для разминки, событие + главный приём для афиши. Результат и шаги запоминаются на этом устройстве.
+(function () {
+  const WORDS = ["тесно", "простор", "падение", "эхо", "шум", "тишина", "рост", "взрыв", "сон", "скорость", "хаос", "порядок", "баланс", "ритм", "сдвиг"];
+  // [название, уровень 2 (когда/где), детали, цвет карточки]
+  const EVENTS = [
+    ["Джаз на крыше", "28 ноября · 20:00 · крыша «Бетон»", "Концерт трио «Северный ветер». Заводская улица, 5. Вход 500 ₽ · 16+", "yellow"],
+    ["Ночь шрифтов", "4 декабря · 19:00 · Городская библиотека № 3", "Лекция и мастер-класс по леттерингу. Вход свободный, регистрация на сайте", "pink"],
+    ["Винтажный маркет", "6–7 декабря · 12:00–20:00 · лофт «Фабрика»", "Одежда, пластинки, книги и посуда из прошлого века. Вход 200 ₽", "peach"],
+    ["Кино под пледом", "Каждую пятницу декабря · 21:00 · двор Музея города", "Показы классики под открытым небом, пледы и чай на месте. Бесплатно · 12+", "lavender"],
+    ["Бег до рассвета", "13 декабря · 05:30 · старт на Набережной", "Ночной забег на 10 км с фонариками. Регистрация до 10 декабря", "blue"],
+    ["Тишина", "1–21 декабря · галерея «Пустота»", "Выставка минималистичной графики. 11:00–19:00, понедельник — выходной", "mint"],
+    ["Шум", "20 декабря · 22:00–06:00 · клуб «Котельная»", "Фестиваль электронной музыки: 12 артистов, 2 сцены. Билеты от 900 ₽ · 18+", "coral"],
+    ["Сырники-фест", "14 декабря · 10:00–16:00 · Центральный рынок", "Гастрономический фестиваль: 20 рецептов, конкурс и мастер-классы. Вход свободный", "yellow"]
+  ];
+  // [приём, подсказка, цвет]
+  const MOVES = [
+    ["Масштаб 1 : 10", "Главное слово огромное, всё остальное — очень мелкое. Никаких средних размеров.", "yellow"],
+    ["Обрез", "Слово больше формата и уходит за край листа. Проверьте, что оно остаётся узнаваемым.", "pink"],
+    ["Диагональ", "Главное слово под углом 15–45°. Остальной текст можно держать горизонтально — для контраста.", "peach"],
+    ["Ритм и повтор", "Слово повторяется 5–10 раз, внутри повтора меняется одно свойство: начертание, кегль или цвет.", "lavender"],
+    ["Вертикаль", "Главное слово набрано вертикально или повёрнуто на 90°. Сильная ось через весь лист.", "blue"],
+    ["Текст-пятно", "Детали или описание набраны плотным блоком, который работает как фактура или серый прямоугольник.", "mint"],
+    ["Слово-образ", "Буквы показывают смысл: падают, разлетаются, сжимаются, теряются. Можно разбить слово на отдельные буквы.", "coral"],
+    ["Пустота", "Почти пустой лист и маленький текст. Пустое поле — главный элемент, место текста выбрано точно.", "peach"]
+  ];
+  const STEPS = [
+    ["3 мин", "Фрейм и текст", "Фрейм A3 842 × 1191, включите Clip content. Скопируйте текст события и сделайте Text Styles для уровней 2 и 3."],
+    ["7 мин", "Три эскиза", "Три быстрые миниатюры рядом с фреймом: где главное слово и как работает приём. Выберите лучшую."],
+    ["12 мин", "Главное слово-образ", "Кегль, начертание, трекинг, поворот, обрез — приём должен читаться без подписи."],
+    ["8 мин", "Уровни 2 и 3", "Дата, время, место, детали. «Ёлочки», тире, неразрывные пробелы. Мелкий текст выравнивайте по общей оси."],
+    ["5 мин", "Цвет и проверка", "Не больше 3 цветов. Уменьшите масштаб до 25 % или отойдите от экрана: что видно первым?"],
+    ["+", "Вторая версия", "Если успеваете — та же афиша с другим главным приёмом. Сравните характер."]
+  ];
+  const KEY = "type_poster_task";
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const rnd = n => Math.floor(Math.random() * n);
+  let st = null;
+  try { st = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!st || !Array.isArray(st.done)) st = { w: [], e: null, m: null, done: [] };
+  if (!Array.isArray(st.w)) st.w = [];
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
+
+  function other(cur, n) { const pool = [...Array(n).keys()].filter(k => k !== cur); return pool[rnd(pool.length)]; }
+
+  function renderOwn() {
+    const opt = (list, sel) => list.map((x, k) => `<option value="${k}" ${k === sel ? "selected" : ""}>${esc(x[0])}</option>`).join("");
+    document.getElementById("own").innerHTML = `
+      <label class="note ink">Событие<br><select data-own="e">${opt(EVENTS, st.e)}</select></label>
+      <label class="note ink">Главный приём<br><select data-own="m">${opt(MOVES, st.m)}</select></label>`;
+    document.querySelectorAll("[data-own]").forEach(s => s.onchange = () => {
+      if (st.e === null) st.e = 0;
+      if (st.m === null) st.m = 0;
+      st[s.dataset.own] = Number(s.value);
+      save(); render();
+    });
+  }
+
+  async function copyEvent() {
+    const e = EVENTS[st.e];
+    const txt = `${e[0]}\n${e[1]}\n${e[2]}`;
+    const b = document.getElementById("copyBtn");
+    try { await navigator.clipboard.writeText(txt); b.textContent = "Скопировано ✓"; }
+    catch (err) { b.textContent = "Выделите текст и скопируйте вручную"; }
+    setTimeout(() => { b.textContent = "Скопировать текст"; }, 2000);
+  }
+
+  function render() {
+    document.getElementById("words").innerHTML = st.w.map(k => `<span>${esc(WORDS[k])}</span>`).join("");
+    document.getElementById("dealWords").innerHTML = (st.w.length ? "Вытянуть заново" : "Вытянуть слова") + ' <span class="arr">→</span>';
+
+    const draw = document.getElementById("draw");
+    if (st.e === null || st.m === null) draw.innerHTML = "";
+    else {
+      const e = EVENTS[st.e], m = MOVES[st.m];
+      draw.innerHTML = `
+        <div class="mcards">
+          <div class="mcard" style="background:var(--white)"><span class="lbl">Событие</span><b>${esc(e[0])}</b>
+            <button type="button" class="linkbtn u" data-re="e">другое событие</button></div>
+          <div class="mcard" style="background:var(--${m[2]})"><span class="lbl">Главный приём</span><b>${esc(m[0])}</b><small>${esc(m[1])}</small>
+            <button type="button" class="linkbtn u" data-re="m">другой приём</button></div>
+        </div>
+        <div class="event"><span class="lbl note">Текст афиши — копируйте как есть</span>
+          <span class="ttl">${esc(e[0])}</span><span class="row2">${esc(e[1])}</span><span class="det">${esc(e[2])}</span>
+          <button type="button" class="btn ghost small copy" id="copyBtn">Скопировать текст</button></div>`;
+      draw.querySelectorAll("[data-re]").forEach(b => b.onclick = () => {
+        const k = b.dataset.re; st[k] = other(st[k], k === "e" ? EVENTS.length : MOVES.length); save(); render();
+      });
+      document.getElementById("copyBtn").onclick = copyEvent;
+    }
+    document.getElementById("deal").innerHTML = (st.e === null ? "Вытянуть задание" : "Вытянуть заново") + ' <span class="arr">→</span>';
+
+    document.getElementById("hints").innerHTML = MOVES.map((m, k) => `
+      <div class="hint ${k === st.m ? "mine" : ""}"><b>${esc(m[0])}</b><small>${esc(m[1])}</small></div>`).join("");
+
+    document.getElementById("steps").innerHTML = STEPS.map((s, i) => `
+      <label class="step ${st.done.includes(i) ? "done" : ""}"><input type="checkbox" data-step="${i}" ${st.done.includes(i) ? "checked" : ""}>
+        <span class="t">${esc(s[0])}</span><div><b>${esc(s[1])}</b><small>${esc(s[2])}</small></div></label>`).join("");
+    document.querySelectorAll("[data-step]").forEach(c => c.onchange = () => {
+      const i = Number(c.dataset.step);
+      st.done = c.checked ? [...new Set([...st.done, i])] : st.done.filter(x => x !== i);
+      save(); render();
+    });
+    document.getElementById("progress").textContent = st.done.length ? `· готово ${st.done.length} из ${STEPS.length}` : "";
+    renderOwn();
+  }
+
+  document.getElementById("dealWords").onclick = () => { st.w = shuffle([...WORDS.keys()]).slice(0, 3); save(); render(); };
+  document.getElementById("deal").onclick = () => { st.e = rnd(EVENTS.length); st.m = rnd(MOVES.length); save(); render(); };
+  document.getElementById("ownToggle").onclick = () => document.getElementById("own").classList.toggle("on");
+  render();
+})();
+</script>
+</body>
+</html>

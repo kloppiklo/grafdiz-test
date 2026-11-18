@@ -35,7 +35,9 @@ window.TESTS = [
     title: "Типографика", module: "Модуль 2 · пары 09–11",
     theory: "materials/typography-10.html", theoryBlock: "Пара 10 · Повторение и правила",
     extras: [
-      { kind: "practice", title: "«Почини текст»", note: "пара 10: файл в Figma — сделайте Duplicate фрейма «Статья»", href: "https://www.figma.com/design/mgu9X06K2KASfKqr4JyqHO", short: "Практика 10", block: "Пара 10 · Повторение и правила" }
+      { kind: "practice", title: "«Почини текст»", note: "пара 10: файл в Figma — сделайте Duplicate фрейма «Статья»", href: "https://www.figma.com/design/mgu9X06K2KASfKqr4JyqHO", short: "Практика 10", block: "Пара 10 · Повторение и правила" },
+      { kind: "deck", id: "p11", title: "Типографическая композиция", note: "пара 11: шрифт как графическая форма, разминка, афиша", href: "theory.html?t=module2&d=p11", src: "materials/typography-11.html", short: "Пара 11", block: "Пара 11 · Типографическая композиция" },
+      { kind: "practice", title: "Типографическая афиша", note: "пара 11: разминка «Три слова» и афиша по жребию", href: "task-type-poster.html", short: "Практика 11", block: "Пара 11 · Типографическая композиция" }
     ]
   },
   { id: "module3", status: "soon", color: "lavender", title: "Изображение и графическая система", module: "Модуль 3 · пары 12–17" },
