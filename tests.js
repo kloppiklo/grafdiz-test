@@ -2,7 +2,7 @@
 // строка здесь со status: "open" и ключ ответов в базе для этого id.
 // status: "theory" — теста ещё нет, но материалы темы уже видны во вкладке «Теория».
 // theory — необязательная ссылка на презентацию с теорией (папка materials/).
-// extras — дополнительные материалы для вкладки «Теория»: kind = workbook (рабочая тетрадь), task (задание для группы), practice (практика пары),
+// extras — дополнительные материалы для вкладки «Теория»: kind = workbook (рабочая тетрадь), task (задание для группы), practice (практика пары), text (конспект-страница),
 //   deck (ещё одна презентация: id + src, открывается через theory.html?t=<тема>&d=<id>).
 //   block — подзаголовок блока внутри темы (например, пара); theoryBlock — блок основной презентации. Отработка и тест попадают в «Вся тема».
 // otr — id отработки этой темы (см. OTRABOTKI). Модуль берётся из подписи module: «Модуль N · …».
@@ -40,7 +40,14 @@ window.TESTS = [
       { kind: "practice", title: "Типографическая афиша", note: "пара 11: разминка «Три слова» и афиша по жребию", href: "task-type-poster.html", short: "Практика 11", block: "Пара 11 · Типографическая композиция" }
     ], otr: "type"
   },
-  { id: "module3", status: "soon", color: "lavender", title: "Изображение и графическая система", module: "Модуль 3 · пары 12–17" },
+  {
+    id: "module3", status: "theory", color: "lavender",
+    title: "Изображение и графическая система", module: "Модуль 3 · пары 12–17",
+    extras: [
+      { kind: "text", title: "Изображение в дизайне", note: "пара 12: кадрирование, масштаб, текст и фото, Crop / Mask / Blend в Figma", href: "image-theory.html", short: "Конспект 12", block: "Пара 12 · Изображение в дизайне" },
+      { kind: "practice", title: "Постер с фотографией", note: "пара 12: мудборд, затем постер A3 по жребию", href: "task-photo-poster.html", short: "Практика 12", block: "Пара 12 · Изображение в дизайне" }
+    ]
+  },
   { id: "module4", status: "soon", color: "mint", title: "Illustrator и векторное мышление", module: "Модуль 4 · пары 18–25" },
   { id: "module5", status: "soon", color: "peach", title: "Плакат", module: "Модуль 5 · пары 26–29" },
   { id: "module6", status: "soon", color: "blue", title: "Айдентика", module: "Модуль 6 · пары 30–33" }

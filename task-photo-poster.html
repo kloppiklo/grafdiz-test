@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f0e2">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Постер с фотографией</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="style.css?v=24">
+<style>
+  .wrap.task { max-width: 920px; }
+  .draw { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .mcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .mcard { border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .mcard .lbl { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .mcard b { font-size: 22px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; }
+  .mcard small { font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+  .linkbtn.u { align-self: flex-start; padding: 0; font-size: 13px; text-decoration: underline; color: var(--ink); }
+  .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+  .rule { border-radius: 18px; padding: 14px; line-height: 1.4; }
+  .rule b { display: block; margin-bottom: 4px; }
+  .timeline { display: flex; flex-direction: column; gap: 8px; }
+  .phase { font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 6px 0 0; }
+  .step { display: grid; grid-template-columns: 28px 64px minmax(0, 1fr); gap: 12px; align-items: start; background: var(--white); border-radius: var(--r-row); padding: 14px; cursor: pointer; }
+  .step input { width: 22px; height: 22px; margin: 0; accent-color: var(--ink); cursor: pointer; }
+  .step .t { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .step small { display: block; color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+  .step.done b { text-decoration: line-through; color: var(--ink-2); }
+  .hints { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  .hint { background: var(--white); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .hint.mine { outline: 2px solid var(--ink); }
+  .hint b { font-size: 16px; }
+  .hint small { color: var(--ink-2); font-size: 13px; line-height: 1.4; }
+  .hint .tag { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+  ul.clean, ol.clean { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; line-height: 1.45; }
+  .event { background: var(--white); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+  .event .ttl { font-size: 26px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; }
+  .event .row2 { font-weight: 600; }
+  .event .det { color: var(--ink-2); font-size: 14px; line-height: 1.45; }
+  .copy { align-self: flex-start; margin-top: 6px; }
+  .event .btn.ghost { background: var(--cream); }
+  .own { display: none; flex-direction: column; gap: 10px; }
+  .own.on { display: flex; }
+  .own select { font: inherit; padding: 10px 12px; border-radius: 12px; border: 0; background: var(--white); max-width: 100%; }
+  .mb { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  .mb div { background: rgba(255,255,255,.75); border-radius: 18px; padding: 14px; line-height: 1.4; font-size: 14px; }
+  .mb b { display: block; font-size: 22px; letter-spacing: -.02em; }
+  .card p { margin: 0; line-height: 1.5; }
+</style>
+</head>
+<body>
+<main class="wrap task" id="app">
+  <div class="topbar"><a class="icon-btn" href="./#theory" aria-label="Назад">←</a><span class="chip">Модуль 3 · изображение</span><span class="chip">пара 12 · практика</span></div>
+  <h1>Постер<br><em>с фотографией</em></h1>
+  <p class="muted">Сегодня вся пара — практика. Сначала вытягиваете событие и главный приём. Потом 20 минут собираете мудборд: ищете настроение, цвет и шрифт. Затем 50 минут делаете постер A3 на основе своей фотографии. Перед работой прочитайте <a href="image-theory.html">конспект</a>: кадрирование, масштаб, текст и фото, инструменты Crop, Mask и Blend.</p>
+
+  <section class="card pink">
+    <div class="row"><h2 class="grow">Ваше задание</h2><span class="chip">жребий</span></div>
+    <p class="note ink">Нажмите «Вытянуть»: выпадет событие и главный приём. Если не нравится что-то одно, поменяйте только его. Подберите событие под фотографию, которую вы принесли: у каждого события указано, какое фото к нему подойдёт. Можно выбрать и самому.</p>
+    <div class="row">
+      <button type="button" class="btn" id="deal">Вытянуть задание <span class="arr">→</span></button>
+      <button type="button" class="linkbtn u" id="ownToggle">выбрать самому</button>
+    </div>
+    <div class="own" id="own"></div>
+    <div class="draw" id="draw"></div>
+  </section>
+
+  <section class="card yellow">
+    <div class="row"><h2 class="grow">Шаг 1 · Мудборд</h2><span class="chip">20 мин</span></div>
+    <p>Мудборд — это доска настроения, на которой собраны картинки, цвета и шрифты. Он помогает понять, каким будет постер, ещё до того, как вы начнёте его делать. Создайте в Figma фрейм <b>1920 × 1080</b> с названием «Мудборд» и соберите на нём:</p>
+    <div class="mb">
+      <div><b>2–3</b>ваших фото или кандидата на главное фото</div>
+      <div><b>3–4</b>референса: постеры с фотографией, которые вам нравятся</div>
+      <div><b>3–4</b>цвета палитры: возьмите их пипеткой (<b>I</b>) с фото и референсов</div>
+      <div><b>1–2</b>шрифта: наберите название события выбранными шрифтами</div>
+      <div><b>3</b>слова, которые описывают настроение постера</div>
+      <div><b>3</b>кадра главного фото: общий, средний и крупный план</div>
+    </div>
+    <p class="note ink">Где искать: Pinterest, Behance, Are.na — референсы; Unsplash, Pexels — фото; Google Fonts и шрифты Figma — гарнитуры. Не копируйте референс: возьмите из него одну идею, например кадр, цвет или место текста.</p>
+  </section>
+
+  <section class="card lavender">
+    <div class="row"><h2 class="grow">Шаг 2 · Постер</h2><span class="chip">50 мин</span></div>
+    <p>Возьмите с мудборда лучший кадр, палитру и шрифт. Соберите постер события так, чтобы главный приём читался сразу.</p>
+  </section>
+
+  <h2 class="sub">Ограничения</h2>
+  <div class="rules">
+    <div class="rule" style="background:var(--yellow)"><b>Формат</b>Фрейм A3 вертикальный: 842 × 1191. У фрейма включите Clip content.</div>
+    <div class="rule" style="background:var(--pink)"><b>Одна фотография</b>Главное фото одно. Его можно повторять в разных кадрах, но других фото не добавляйте. Не растягивайте фото: масштабируйте только с Shift.</div>
+    <div class="rule" style="background:var(--mint)"><b>Шрифты и цвет</b>Не больше 2 гарнитур и не больше 3 цветов кроме фотографии. Цвета берите из палитры мудборда.</div>
+    <div class="rule" style="background:var(--peach)"><b>Вся информация</b>Название, дата, время, место и детали. Тексты копируйте отсюда: они уже набраны правильно.</div>
+  </div>
+
+  <h2 class="sub">Шаги <span class="note" id="progress"></span></h2>
+  <div class="timeline" id="steps"></div>
+
+  <h2 class="sub">Подсказки к приёмам</h2>
+  <p class="note">Ваш приём выделен рамкой. Другие можно добавить как второстепенные, но главный должен быть один.</p>
+  <div class="hints" id="hints"></div>
+
+  <div class="cols">
+    <div class="col">
+      <h2 class="sub">Figma — коротко</h2>
+      <section class="card">
+        <ul class="clean">
+          <li><b>Crop</b>: двойной клик по фото, затем тяните края рамки. Enter — готово.</li>
+          <li><b>Mask</b>: форма под фото, выделить оба слоя, затем <b>⌘⌥M</b> (Ctrl Alt M).</li>
+          <li><b>Blend</b>: панель Design, блок Layer, список рядом с прозрачностью.</li>
+          <li><b>Ч/б</b>: Fill → настройки картинки → Saturation −100.</li>
+          <li><b>Пипетка I</b> — цвет текста берите с фото.</li>
+        </ul>
+        <a class="linkbtn u" href="image-theory.html#figma">подробно в конспекте</a>
+      </section>
+    </div>
+    <div class="col">
+      <h2 class="sub">Критерии</h2>
+      <section class="card">
+        <ul class="clean">
+          <li>Мудборд собран: фото, референсы, палитра, шрифт, 3 слова</li>
+          <li>Кадр выбран осознанно, ничего не обрезано по суставам</li>
+          <li>Есть контраст масштабов: с 3 метров видно одно главное</li>
+          <li>Главный приём читается без подписи</li>
+          <li>Весь текст читается, вся информация на месте</li>
+          <li>Не больше 2 гарнитур и 3 цветов</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <h2 class="sub">Разбор «Мудборд → постер»</h2>
+  <section class="card mint">
+    <p>Показываем на общем экране мудборд и постер рядом. Группа угадывает событие и три слова настроения, потом автор рассказывает, что хотел. Обсуждаем:</p>
+    <ul class="clean">
+      <li>Что вы увидели первым: фото или текст?</li>
+      <li>Узнаётся ли настроение мудборда в постере?</li>
+      <li>Какой кадр выбран и почему? Что изменилось бы при другом кадре?</li>
+      <li>Что убрать, чтобы главное стало сильнее?</li>
+    </ul>
+  </section>
+
+  <h2 class="sub">Домашнее задание</h2>
+  <section class="card peach">
+    <p>Доведите постер до чистовика по критериям. Мудборд оставьте рядом в том же файле. Ссылку на файл пришлите в чат до следующего занятия.</p>
+  </section>
+</main>
+
+<script>
+// Жеребьёвка: событие + главный приём. Результат и шаги запоминаются на этом устройстве.
+(function () {
+  // [название, когда/где, детали, какое фото подойдёт, цвет карточки]
+  const EVENTS = [
+    ["Лица района", "5–20 декабря · библиотека на Садовой", "Фотовыставка портретов соседей и их историй. 11:00–20:00, вход свободный", "портрет", "pink"],
+    ["Открытый микрофон", "12 декабря · 19:00 · кафе «Полка»", "Стихи, песни и стендап от всех желающих. Запись на месте · 14+", "портрет", "yellow"],
+    ["Голос", "19 декабря · 18:30 · Дом культуры «Заря»", "Концерт молодёжного хора: от классики до поп-музыки. Вход 300 ₽", "портрет", "lavender"],
+    ["Вещи с историей", "7 декабря · 12:00–18:00 · лофт «Фабрика»", "Маркет старых вещей: обменяй свою на чужую. Вход свободный", "предмет", "peach"],
+    ["Сделано руками", "14–15 декабря · 11:00–19:00 · Гостиный двор", "Ярмарка молодых мастеров: керамика, украшения, принты. Вход 150 ₽", "предмет", "mint"],
+    ["Музей одной вещи", "до 31 января · галерея «Точка»", "Выставка, где каждый зал посвящён одному предмету. 12:00–20:00, понедельник — выходной", "предмет", "blue"],
+    ["Город сверху", "Каждую субботу · 15:00 · сбор у метро «Сенная»", "Экскурсия по крышам с гидом. Регистрация обязательна · 16+", "архитектура", "lavender"],
+    ["Ночная фотопрогулка", "13 декабря · 21:00 · старт у Речного вокзала", "Снимаем город в темноте вместе с фотографом. Возьмите телефон и тёплую одежду", "архитектура или пейзаж", "blue"],
+    ["Дома с характером", "10 декабря · 18:00 · Центр городской культуры", "Лекция об архитектуре района: модерн, конструктивизм, хрущёвки. Вход свободный", "архитектура", "yellow"]
+  ];
+  // [приём, подсказка, инструмент, цвет]
+  const MOVES = [
+    ["Крупный план под обрез", "Фото на весь лист и уходит за края. Кадр крупный: лицо, деталь предмета или кусок фасада. Текст в пустом месте кадра.", "Crop · масштаб", "yellow"],
+    ["Фото в букве", "Название набрано огромным жирным шрифтом, и фото видно только внутри букв. Слово занимает почти весь лист.", "Mask", "pink"],
+    ["Объект перед текстом", "Огромное слово за фигурой: человек, предмет или здание перекрывает часть букв. Слово должно остаться узнаваемым.", "Mask · перо", "lavender"],
+    ["Дуотон", "Фото в два цвета из палитры мудборда. Текст одним из этих цветов или белый.", "Blend: Multiply / Screen", "peach"],
+    ["Маленькое фото в пустоте", "Фото занимает не больше 1/6 листа, вокруг пустое поле. Текст точно выровнен относительно фото.", "масштаб", "mint"],
+    ["Кадр-серия", "Одно фото, 3–5 разных кадров: от общего к детали. Ряд или сетка кадров рассказывает историю.", "Crop", "blue"],
+    ["Плашка и полоса", "Фото на весь лист, текст на цветной плашке или полосе через весь формат. Плашка тоже элемент композиции.", "Crop · цвет", "coral"],
+    ["Тон поверх фото", "Цветной слой поверх фото меняет его настроение. Текст стоит на этом тоне и хорошо читается.", "Blend: Color / Overlay", "olive"]
+  ];
+  // [фаза, время, шаг, описание]
+  const STEPS = [
+    ["Мудборд", "3 мин", "Фрейм и задание", "Вытяните задание. Создайте фрейм «Мудборд» 1920 × 1080 и положите туда свои фото."],
+    ["Мудборд", "10 мин", "Референсы", "3–4 постера с фотографией по вашему приёму или настроению. Подпишите, что берёте из каждого."],
+    ["Мудборд", "4 мин", "Палитра и шрифт", "3–4 кружка цвета пипеткой с фото. Название события в 1–2 шрифтах. Три слова настроения."],
+    ["Мудборд", "3 мин", "Три кадра", "Скопируйте главное фото 3 раза и кадрируйте: общий, средний и крупный план. Выберите лучший."],
+    ["Постер", "3 мин", "Фрейм и текст", "Фрейм A3 842 × 1191, включите Clip content. Скопируйте текст события отсюда."],
+    ["Постер", "7 мин", "Три эскиза", "Три быстрые миниатюры рядом: где фото, где главное слово, как работает приём. Выберите лучшую."],
+    ["Постер", "15 мин", "Фото и главный приём", "Поставьте кадр, затем сделайте маску, наложение или обрез. Приём должен читаться без подписи."],
+    ["Постер", "12 мин", "Текст", "Название, дата и место, детали — три уровня. «Ёлочки», тире, неразрывные пробелы. Проверьте, что всё читается."],
+    ["Постер", "8 мин", "Цвет и проверка", "Цвета только из палитры. Уменьшите масштаб до 25 %: что видно первым?"],
+    ["Постер", "5 мин", "Рядом с мудбордом", "Поставьте постер рядом с мудбордом. Сохранилось ли настроение? Если нет, поправьте цвет или кадр."],
+    ["Постер", "+", "Вторая версия", "Если успеваете, сделайте тот же постер с другим главным приёмом и сравните."]
+  ];
+  const KEY = "photo_poster_task";
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const rnd = n => Math.floor(Math.random() * n);
+  let st = null;
+  try { st = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!st || !Array.isArray(st.done)) st = { e: null, m: null, done: [] };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
+
+  function other(cur, n) { const pool = [...Array(n).keys()].filter(k => k !== cur); return pool[rnd(pool.length)]; }
+
+  function renderOwn() {
+    const opt = (list, sel, f) => list.map((x, k) => `<option value="${k}" ${k === sel ? "selected" : ""}>${esc(f(x))}</option>`).join("");
+    document.getElementById("own").innerHTML = `
+      <label class="note ink">Событие<br><select data-own="e">${opt(EVENTS, st.e, x => x[0] + " — фото: " + x[3])}</select></label>
+      <label class="note ink">Главный приём<br><select data-own="m">${opt(MOVES, st.m, x => x[0])}</select></label>`;
+    document.querySelectorAll("[data-own]").forEach(s => s.onchange = () => {
+      if (st.e === null) st.e = 0;
+      if (st.m === null) st.m = 0;
+      st[s.dataset.own] = Number(s.value);
+      save(); render();
+    });
+  }
+
+  async function copyEvent() {
+    const e = EVENTS[st.e];
+    const b = document.getElementById("copyBtn");
+    try { await navigator.clipboard.writeText(`${e[0]}\n${e[1]}\n${e[2]}`); b.textContent = "Скопировано ✓"; }
+    catch (err) { b.textContent = "Выделите текст и скопируйте вручную"; }
+    setTimeout(() => { b.textContent = "Скопировать текст"; }, 2000);
+  }
+
+  function render() {
+    const draw = document.getElementById("draw");
+    if (st.e === null || st.m === null) draw.innerHTML = "";
+    else {
+      const e = EVENTS[st.e], m = MOVES[st.m];
+      draw.innerHTML = `
+        <div class="mcards">
+          <div class="mcard" style="background:var(--white)"><span class="lbl">Событие</span><b>${esc(e[0])}</b><small>Подойдёт фото: ${esc(e[3])}</small>
+            <button type="button" class="linkbtn u" data-re="e">другое событие</button></div>
+          <div class="mcard" style="background:var(--${m[3]})"><span class="lbl">Главный приём · ${esc(m[2])}</span><b>${esc(m[0])}</b><small>${esc(m[1])}</small>
+            <button type="button" class="linkbtn u" data-re="m">другой приём</button></div>
+        </div>
+        <div class="event"><span class="lbl note">Текст постера — копируйте как есть</span>
+          <span class="ttl">${esc(e[0])}</span><span class="row2">${esc(e[1])}</span><span class="det">${esc(e[2])}</span>
+          <button type="button" class="btn ghost small copy" id="copyBtn">Скопировать текст</button></div>`;
+      draw.querySelectorAll("[data-re]").forEach(b => b.onclick = () => {
+        const k = b.dataset.re; st[k] = other(st[k], k === "e" ? EVENTS.length : MOVES.length); save(); render();
+      });
+      document.getElementById("copyBtn").onclick = copyEvent;
+    }
+    document.getElementById("deal").innerHTML = (st.e === null ? "Вытянуть задание" : "Вытянуть заново") + ' <span class="arr">→</span>';
+
+    document.getElementById("hints").innerHTML = MOVES.map((m, k) => `
+      <div class="hint ${k === st.m ? "mine" : ""}"><span class="tag">${esc(m[2])}</span><b>${esc(m[0])}</b><small>${esc(m[1])}</small></div>`).join("");
+
+    let phase = "";
+    document.getElementById("steps").innerHTML = STEPS.map((s, i) => {
+      const head = s[0] !== phase ? `<p class="phase">${esc(s[0])}</p>` : "";
+      phase = s[0];
+      return head + `
+      <label class="step ${st.done.includes(i) ? "done" : ""}"><input type="checkbox" data-step="${i}" ${st.done.includes(i) ? "checked" : ""}>
+        <span class="t">${esc(s[1])}</span><div><b>${esc(s[2])}</b><small>${esc(s[3])}</small></div></label>`;
+    }).join("");
+    document.querySelectorAll("[data-step]").forEach(c => c.onchange = () => {
+      const i = Number(c.dataset.step);
+      st.done = c.checked ? [...new Set([...st.done, i])] : st.done.filter(x => x !== i);
+      save(); render();
+    });
+    document.getElementById("progress").textContent = st.done.length ? `· готово ${st.done.length} из ${STEPS.length}` : "";
+    renderOwn();
+  }
+
+  document.getElementById("deal").onclick = () => { st.e = rnd(EVENTS.length); st.m = rnd(MOVES.length); save(); render(); };
+  document.getElementById("ownToggle").onclick = () => document.getElementById("own").classList.toggle("on");
+  render();
+})();
+</script>
+</body>
+</html>

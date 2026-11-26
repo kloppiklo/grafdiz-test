@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f0e2">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Изображение в дизайне</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="style.css?v=24">
+<style>
+  .wrap.task { max-width: 760px; }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; }
+  .toc a { background: var(--white); border-radius: 999px; padding: 8px 14px; font-size: 14px; font-weight: 500; color: var(--ink); text-decoration: none; }
+  .card p { margin: 0; line-height: 1.5; }
+  .card h3 { margin: 6px 0 0; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+  ul.clean { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; line-height: 1.45; }
+  .num { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; }
+  .tile { background: var(--white); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.4; }
+  .tile b { font-size: 15px; }
+  .tile small { color: var(--ink-2); font-size: 13px; }
+  /* схемы: серое = фото, чёрное = текст */
+  .sch { position: relative; aspect-ratio: 3 / 4; border-radius: 10px; overflow: hidden; background: #ece6d6; }
+  .sch .ph { position: absolute; background: linear-gradient(135deg, #8e8a7f, #b9b3a4); }
+  .sch .tx { position: absolute; background: var(--ink); border-radius: 2px; }
+  .sch .pl { position: absolute; background: var(--white); }
+  .sch .fig { position: absolute; background: #55524a; border-radius: 50% 50% 8px 8px; }
+  .key { display: flex; gap: 6px; flex-wrap: wrap; }
+  .key kbd { font: 600 13px var(--font); background: var(--white); border-radius: 8px; padding: 3px 8px; }
+  .tip { background: rgba(255,255,255,.7); border-radius: 18px; padding: 14px; line-height: 1.45; }
+  .tip b { display: block; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<main class="wrap task">
+  <div class="topbar"><a class="icon-btn" href="./#theory" aria-label="Назад">←</a><span class="chip">Модуль 3 · изображение</span><span class="chip">пара 12 · конспект</span></div>
+  <h1>Изображение<br><em>в дизайне</em></h1>
+  <p class="muted">Короткий конспект к практике. Прочитайте перед тем, как собирать постер, и возвращайтесь сюда по ходу работы.</p>
+  <nav class="toc"><a href="#crop">Кадрирование</a><a href="#scale">Масштаб</a><a href="#text">Текст и фото</a><a href="#figma">Figma: Crop, Mask, Blend</a></nav>
+
+  <section class="card yellow" id="crop">
+    <span class="num">01</span>
+    <h2>Кадрирование</h2>
+    <p>Кадрирование решает, что зритель увидит, а что останется за краем. Одна и та же фотография после разной обрезки рассказывает разные истории. Портрет во весь рост говорит о человеке и месте, где он стоит. Крупный план глаз говорит о чувстве.</p>
+    <h3>Планы</h3>
+    <div class="grid2">
+      <div class="tile"><b>Общий</b><small>Объект целиком и вокруг него много места. Рассказывает, где мы находимся.</small></div>
+      <div class="tile"><b>Средний</b><small>Человек по пояс, предмет вместе с ближним окружением. Это спокойный рассказ.</small></div>
+      <div class="tile"><b>Крупный</b><small>Лицо или предмет на весь кадр. Здесь важны эмоция и характер.</small></div>
+      <div class="tile"><b>Деталь</b><small>Глаз, руки, фактура, кусок фасада. Создаёт загадку и напряжение.</small></div>
+    </div>
+    <h3>Правила, которые работают</h3>
+    <ul class="clean">
+      <li><b>Правило третей.</b> Разделите кадр на 3 × 3 и поставьте главное на линию или на пересечение линий. Объект строго в центре смотрится статично, это тоже приём, но выбирайте его осознанно.</li>
+      <li><b>Место по направлению взгляда.</b> Если человек смотрит вправо, оставьте пустое место справа. Взгляд и движение должны вести внутрь постера, а не за его край.</li>
+      <li><b>Не режьте по суставам.</b> Не обрезайте человека по шее, локтям, запястьям, коленям или щиколоткам. Режьте между ними.</li>
+      <li><b>Ровный горизонт.</b> Горизонт и вертикали зданий выравнивайте. Наклон допустим только как явный приём, от 10° и больше.</li>
+      <li><b>Обрез — это смелость.</b> Объект, который уходит за край листа, кажется больше самого листа. Можно отрезать даже половину лица.</li>
+    </ul>
+  </section>
+
+  <section class="card lavender" id="scale">
+    <span class="num">02</span>
+    <h2>Масштаб</h2>
+    <p>В постере масштаб работает на двух уровнях. Первый — насколько крупный объект внутри кадра. Второй — какую часть листа занимает сама фотография. Сильный постер почти всегда строится на <b>контрасте масштабов</b>.</p>
+    <div class="grid2">
+      <div class="tile"><div class="sch"><div class="ph" style="inset:0"></div><div class="tx" style="left:10%;bottom:10%;width:55%;height:7%"></div></div><b>Фото под обрез</b><small>Фото занимает весь лист. Это погружение: зритель оказывается внутри кадра.</small></div>
+      <div class="tile"><div class="sch"><div class="ph" style="left:38%;top:34%;width:24%;height:22%"></div><div class="tx" style="left:10%;bottom:10%;width:40%;height:4%"></div></div><b>Маленькое фото в пустоте</b><small>Много пустого поля. Изображение становится ценным, как экспонат.</small></div>
+      <div class="tile"><div class="sch"><div class="ph" style="left:-20%;top:-10%;width:140%;height:80%"></div><div class="tx" style="left:10%;bottom:8%;width:80%;height:12%"></div></div><b>Деталь крупнее листа</b><small>Кусок объекта увеличен так, что его не сразу узнаёшь. Появляется интрига.</small></div>
+      <div class="tile"><div class="sch"><div class="ph" style="inset:0"></div><div class="tx" style="left:8%;top:8%;width:84%;height:34%;opacity:.85"></div></div><b>Огромный текст + фото</b><small>Слово спорит с фотографией по размеру. Одно из них должно победить.</small></div>
+    </div>
+    <div class="tip"><b>Как проверить</b>Уменьшите масштаб в Figma до 25 % или отойдите от экрана на 3 метра. Если сразу видно одно главное пятно, масштаб работает. Если всё одинаково среднего размера, ищите контраст.</div>
+  </section>
+
+  <section class="card pink" id="text">
+    <span class="num">03</span>
+    <h2>Взаимодействие текста и фото</h2>
+    <p>Текст на постере с фотографией должен решать две задачи: читаться и при этом не спорить с изображением, а дополнять его. Есть четыре основных способа их соединить.</p>
+    <div class="grid2">
+      <div class="tile"><div class="sch"><div class="ph" style="inset:0"></div><div class="fig" style="left:52%;top:30%;width:38%;height:70%"></div><div class="tx" style="left:8%;top:12%;width:36%;height:6%"></div><div class="tx" style="left:8%;top:21%;width:28%;height:3%"></div></div><b>1 · В пустом месте</b><small>Текст стоит на небе, стене или фоне, где нет деталей. Кадрируйте фото так, чтобы такое место появилось.</small></div>
+      <div class="tile"><div class="sch"><div class="ph" style="inset:0"></div><div class="pl" style="left:8%;bottom:8%;width:60%;height:20%"></div><div class="tx" style="left:13%;bottom:18%;width:44%;height:5%"></div></div><b>2 · На плашке</b><small>Под текстом лежит плашка или полоса. Надёжно читается на любом фото. Плашка тоже элемент композиции, поэтому выровняйте её по сетке.</small></div>
+      <div class="tile"><div class="sch"><div class="ph" style="left:0;top:0;width:100%;height:62%"></div><div class="tx" style="left:8%;top:70%;width:70%;height:8%"></div><div class="tx" style="left:8%;top:83%;width:40%;height:3%"></div></div><b>3 · Рядом</b><small>Фото и текст стоят в разных зонах листа и не перекрываются. Это спокойная редакционная схема.</small></div>
+      <div class="tile"><div class="sch"><div class="ph" style="inset:0"></div><div class="tx" style="left:6%;top:18%;width:88%;height:22%"></div><div class="fig" style="left:30%;top:24%;width:40%;height:76%"></div></div><b>4 · Слоями</b><small>Объект стоит перед текстом, перекрывая буквы. Или фото видно внутри букв. Самый «дизайнерский» способ.</small></div>
+    </div>
+    <h3>Чтобы текст читался</h3>
+    <ul class="clean">
+      <li>Нужен контраст: светлый текст ставьте на тёмный участок, тёмный — на светлый. Цвет текста можно взять пипеткой с самой фотографии, тогда он будет «родным».</li>
+      <li>Не ставьте текст на пёструю фактуру (листва, толпа) и на лицо, особенно на глаза.</li>
+      <li>Если пустого места нет, затемните фото слоем чёрного с прозрачностью 20–40 % или градиентом от прозрачного к чёрному под текстом.</li>
+      <li>Главная надпись одна. Остальной текст набирайте мелко и собирайте в один-два блока, а не разбрасывайте по листу.</li>
+      <li>Направление взгляда человека на фото работает как стрелка. Поставьте текст туда, куда он смотрит.</li>
+    </ul>
+  </section>
+
+  <section class="card mint" id="figma">
+    <span class="num">04</span>
+    <h2>Figma: Crop, Mask, Blend</h2>
+
+    <h3>Crop — обрезать фото</h3>
+    <ul class="clean">
+      <li>Перетащите фото прямо во фрейм. В Figma картинка становится заливкой (Fill) прямоугольника.</li>
+      <li>Двойной клик по фото включает режим обрезки. Тяните за края рамки, а саму картинку двигайте внутри неё. Чтобы выйти, нажмите <b>Enter</b> или <b>Esc</b>.</li>
+      <li>Режим можно поменять в панели Fill: нажмите на миниатюру картинки и выберите <b>Fill</b> (заполнить рамку), <b>Fit</b> (вписать целиком), <b>Crop</b> (свободная обрезка) или <b>Tile</b> (повтор узором).</li>
+      <li>Там же есть настройки фото: Exposure, Contrast, Saturation, Temperature. Если поставить <b>Saturation −100</b>, фото станет чёрно-белым.</li>
+      <li>Фото под обрез: растяните его за край фрейма и включите у фрейма <b>Clip content</b>. Всё, что выходит за край, спрячется.</li>
+    </ul>
+
+    <h3>Mask — показать фото через форму</h3>
+    <ul class="clean">
+      <li>Маска — это фигура, которая определяет, какая часть фото видна. Положите фигуру <b>под</b> фото в списке слоёв: маска всегда нижний слой.</li>
+      <li>Выделите оба слоя и нажмите <b>Use as mask</b> на верхней панели или горячие клавиши:</li>
+    </ul>
+    <div class="key"><kbd>⌘ ⌥ M</kbd><kbd>Ctrl Alt M</kbd></div>
+    <ul class="clean">
+      <li><b>Фото в букве.</b> Наберите крупное слово жирным начертанием, положите его под фото и сделайте маской. Фото будет видно только внутри букв.</li>
+      <li><b>Объект перед текстом.</b> Скопируйте фото и положите копию над текстом. Пером (<b>P</b>) обведите контур человека или предмета, положите контур под копию и сделайте маской. Получится, что объект стоит «перед» словом.</li>
+      <li>Если маска «съела» лишнее, проверьте порядок слоёв: всё, что лежит в группе маски выше неё, обрезается по ней.</li>
+    </ul>
+
+    <h3>Blend — режимы наложения</h3>
+    <p>Режим наложения находится в панели Design, в блоке <b>Layer</b>: это выпадающий список рядом с прозрачностью. Он определяет, как слой смешивается с тем, что под ним.</p>
+    <div class="grid2">
+      <div class="tile"><b>Multiply</b><small>Белое исчезает, остальное затемняет то, что под ним. Цветная плашка поверх фото тонирует его. Подходит, чтобы положить текст или текстуру на светлый фон.</small></div>
+      <div class="tile"><b>Screen</b><small>Чёрное исчезает, остальное осветляет. Подходит для светлого текста и эффекта света.</small></div>
+      <div class="tile"><b>Overlay</b><small>Усиливает контраст и окрашивает средние тона. Работает мягче, чем Multiply.</small></div>
+      <div class="tile"><b>Color / Luminosity</b><small>Color перекрашивает фото в цвет слоя и сохраняет светотень. Luminosity берёт у слоя только яркость.</small></div>
+    </div>
+    <div class="tip"><b>Дуотон за минуту</b>Сделайте фото чёрно-белым (Saturation −100) и положите сверху прямоугольник яркого цвета. В режиме <b>Multiply</b> светлые места станут этим цветом, а тени останутся тёмными. В режиме <b>Screen</b> тени станут цветом, а светлые места — белыми.</div>
+  </section>
+
+  <section class="card">
+    <h2>Шпаргалка</h2>
+    <ul class="clean">
+      <li>Сначала кадр, потом текст. Обрежьте фото так, чтобы осталось место для надписи.</li>
+      <li>Одно главное: или фото, или слово. Не оба одинаково.</li>
+      <li>Контраст масштабов сильнее, чем всё среднего размера.</li>
+      <li>Текст должен читаться. Если не читается, используйте плашку, затемнение или другой кадр.</li>
+      <li>Используйте один эффект Blend или Mask, а не все сразу.</li>
+    </ul>
+    <a class="btn" href="task-photo-poster.html">К заданию: постер с фотографией <span class="arr">→</span></a>
+  </section>
+</main>
+</body>
+</html>
