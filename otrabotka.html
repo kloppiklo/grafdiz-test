@@ -14,7 +14,7 @@
 <title>Отработка</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -127,7 +127,7 @@ function run(M, pairId) {
           <li><b>Сделай</b><span>${esc(M.practiceNote || "практика в Figma с критериями")}</span></li>
           <li><b>Сдай</b><span>${esc(M.submitNote || "ссылка на Figma — преподаватель проверит")}</span></li>
         </ol>
-        <p class="note">В конце — итоговый тест. ${esc(M.orderNote || "Пары можно проходить в любом порядке, но лучше по очереди.")}</p>
+        <p class="note">${M.test ? "В конце — итоговый тест. " : ""}${esc(M.orderNote || "Пары можно проходить в любом порядке, но лучше по очереди.")}</p>
       </section>
 
       <section class="card lavender">
@@ -146,12 +146,12 @@ function run(M, pairId) {
       <div class="grid-cards">
       ${cards}
 
-      <section class="card peach test-card">
+      ${M.test ? `<section class="card peach test-card">
         <div class="row"><span class="chip">Финал</span><span class="grow"></span>${testPill}</div>
         <h2>${esc(M.finalTitle || "Итоговый тест модуля")}</h2>
         <p>${esc(M.finalNote || "10 вопросов по всем четырём парам. Результат увидит преподаватель.")}</p>
         <a class="btn block" href="test.html?t=${encodeURIComponent(M.test)}">${last ? "Пройти ещё раз" : "Пройти тест"} <span class="arr">→</span></a>
-      </section>
+      </section>` : ""}
       </div>`;
   }
 
@@ -236,6 +236,7 @@ function run(M, pairId) {
         <p>${esc(T.brief)}</p>
         ${T.words ? `<div class="sub-box"><b>Слова на выбор</b><div class="chips">${T.words.map(w => `<span class="chip">${esc(w)}</span>`).join("")}</div></div>` : ""}
         ${T.text ? `<div class="sub-box"><b>Текст для макета</b><div class="copy-text">${T.text.map(x => `<p>${esc(x)}</p>`).join("")}</div></div>` : ""}
+        ${T.links ? `<div class="sub-box"><b>Файлы и страницы к заданию</b><div class="list flat">${T.links.map(x => `<a class="li" href="${esc(x.href)}" target="_blank" rel="noopener noreferrer"><span class="sw" style="background:var(--white)">↗</span><div class="grow">${esc(x.title)}<small>${esc(x.note || "")}</small></div><span class="go">›</span></a>`).join("")}</div></div>` : ""}
         <div class="sub-box"><b>Ограничения</b><ul class="blist">${T.limits.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
         <div class="sub-box"><b>Порядок работы</b><ol class="steps-list">${T.steps.map(x => `<li>${esc(x)}</li>`).join("")}</ol></div>
         <div class="sub-box"><b>Работа засчитывается, если</b><ul class="crit">${T.criteria.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
@@ -260,7 +261,7 @@ function run(M, pairId) {
 
       ${next
         ? `<a class="btn block" href="${url(next.id)}">Дальше: ${esc(U.next)} ${esc(next.n)} <span class="arr">→</span></a>`
-        : `<a class="btn block" href="test.html?t=${encodeURIComponent(M.test)}">${esc(M.finalTitle || "Итоговый тест модуля")} <span class="arr">→</span></a>`}
+        : M.test ? `<a class="btn block" href="test.html?t=${encodeURIComponent(M.test)}">${esc(M.finalTitle || "Итоговый тест модуля")} <span class="arr">→</span></a>` : ""}
       <a class="btn ghost block" href="${url()}">${esc(M.allLabel || "Все пары модуля")}</a>
       </div></div>`;
 
